@@ -24,18 +24,17 @@ def generate_password_list(student_names):
     return password_list
 
 
-def write_dict_to_csv(password_dict):
+def write_dict_to_csv(password_list):
     """
     Write dictionary to output csv file
     """
     csv_columns = ["Name", "Password"]
-    print(password_dict)
     csv_file = "./outputs/output.csv"
     try:
         with open(csv_file, "w") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
             writer.writeheader()
-            for item in password_dict:
+            for item in password_list:
                 writer.writerow(item)
     except IOError:
         print("I/O error")
@@ -46,9 +45,7 @@ def write_dict_to_csv(password_dict):
 if __name__ == "__main__":
     df = pd.read_csv(INPUT_FILE)
     names = df["Names"]
-    teams = df["Teams"]
     password_list = generate_password_list(names)
-    print(password_list)
     if write_dict_to_csv(password_list):
         print("Success")
     else:
