@@ -6,14 +6,16 @@
 
 Run `python3 --version` and ensure that you have python3.6 installed
 
+1.
 1. Run `pre-commit install`
 2. File PRs following the [github flow](https://guides.github.com/introduction/flow/)
 
 
 ## Usage
 1. `git clone https://github.com/J0/CP3106.git`
-2. `cd CP3106 && python3 main.py`
-3. Select the task you want to run from the given options. Be sure that you have included the relevant files in the input directory
+2. `cd CP3106 && source ./.env/bin/activate`
+3. `pip install requirements.txt && python3 main.py`
+4. Select the task you want to run from the given options. Be sure that you have included the relevant files in the input directory
 
 
 
@@ -29,3 +31,4 @@ Run `python3 --version` and ensure that you have python3.6 installed
 
 ### Task Three:
 - TBD
+
