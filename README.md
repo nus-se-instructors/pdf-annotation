@@ -4,7 +4,7 @@
 
 ## Contributing
 
-Run `python3 --version` and ensure that you have python3.6 installed
+Run `python3 --version` and ensure that you have python3.7 installed
 
 1. Run `pre-commit install`
 2. File PRs following the [github flow](https://guides.github.com/introduction/flow/)
