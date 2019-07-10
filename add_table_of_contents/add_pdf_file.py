@@ -1,10 +1,7 @@
 import logging
 from matplotlib.backends.backend_pdf import PdfPages
-pp = PdfPages('output.pdf')
-for n, fig in enumerate(figs):
-    fig.text(4.25/8.5, 0.5/11., str(n+1), ha='center', fontsize=8)
-    pp.savefig(fig)
-pp.close()
+import PyPDF2
+from tika import parser
 
 
 # Add Page numbers
@@ -21,5 +18,57 @@ pp.close()
 # How to muck around with PDFs:
 # https://automatetheboringstuff.com/chapter13/
 
+
+from reportlab.pdfgen import canvas
+from PyPDF2 import PdfFileReader, PdfFileMerger
+from pdfrw import PdfReader, PdfWriter, PageMerge
+
+
+TEXTBOOK = "./inputs/textbook.pdf"
+OVERLAY = "./outputs/overlay.pdf"
+OUTPUT = "./outputs/textbook_output.pdf"
+
+
+def create_overlay(num_pages):
+    """
+    Create a multi-page document
+    """
+    c = canvas.Canvas(OVERLAY)
+
+    for i in range(num_pages):
+        page_num = c.getPageNumber()
+        text = "%s" % page_num
+        c.drawString(800, 40, text)
+        c.showPage()
+    c.save()
+
+
+def watermarker(textbook, overlay, output):
+    base_pdf = PdfReader(textbook)
+    watermark_pdf = PdfReader(overlay)
+
+    for page in range(len(base_pdf.pages)):
+        mark = watermark_pdf.pages[page]
+        merger = PageMerge(base_pdf.pages[page])
+        merger.add(mark).render()
+
+    writer = PdfWriter()
+    writer.write(output, base_pdf)
+
+
+def extract_text(TEXTBOOK):
+    text = textract.process(TEXTBOOK)
+    print(text)
+
+
+# ----------------------------------------------------------------------
+
+
 if __name__ == "__main__":
-    logging.info("This is an index page")
+    pdf = PdfFileReader(open(TEXTBOOK, "rb"))
+    num_pages = pdf.getNumPages()
+    create_overlay(num_pages)
+    watermarker(TEXTBOOK, OVERLAY, OUTPUT)
+    raw = parser.from_file(TEXTBOOK)
+    with open("pdftotext.txt", "w") as output:
+        output.write(raw["content"])

@@ -22,9 +22,6 @@ def encrypt_files_in_directory(df):
         src_filepath = os.path.join("./inputs/input_files/", jarfile + ".jar")
         dst_filepath = os.path.join("./outputs/output_files/", jarfile + ".jar")
         password = df[PASSWORD][index]
-        import pdb
-
-        pdb.set_trace()
         pyminizip.compress(src_filepath, None, dst_filepath, password, 0)
 
 
