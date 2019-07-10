@@ -12,9 +12,10 @@ Run `python3 --version` and ensure that you have python3.7 installed
 
 ## Usage
 1. `git clone https://github.com/J0/CP3106.git`
-2. `cd CP3106 && source ./.env/bin/activate`
-3. `pip install requirements.txt && python3 main.py`
-4. Select the task you want to run from the given options. Be sure that you have included the relevant files in the input directory
+2. `cd CP3106 && virtualenv .env`
+3. `source ./.env/bin/activate` 
+4. `pip install -r requirements.txt`
+5. Go to the relevant directory and run the respective `main.py` for each task
 
 
 
