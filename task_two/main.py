@@ -15,15 +15,26 @@ import logging
 # https://automatetheboringstuff.com/chapter13/
 
 import fitz
+import os
+from pylovepdf.tools.pagenumber import Pagenumber
 
 
+OUTPUT_FOLDER = "./outputs"
 TEXTBOOK = "./inputs/textbook.pdf"
-OVERLAY = "./outputs/overlay.pdf"
-OUTPUT = "./outputs/textbook_output.pdf"
+OVERLAY = os.path.join(OUTPUT_FOLDER, "overlay.pdf")
+OUTPUT = os.path.join(OUTPUT_FOLDER, "textbook_output.pdf")
 DEFAULT_ERROR_MESSAGE = "%s phase failed"
+PUBLIC_KEY = "project_public_36e2b8c0ce3c0d29905ab7acecbd1174_EwMDq1a590e7848c9bb7f57fd2429741123c9"
 
 
-def add_page_numbers(doc):
+def add_page_numbers(filename):
+
+    t = Pagenumber(PUBLIC_KEY, verify_ssl=True)
+    t.add_file(filename)
+    t.debug = False
+    t.set_output_folder(OUTPUT_FOLDER)
+    t.execute()
+    t.download()
     return True
 
 
@@ -47,13 +58,16 @@ def add_toc(doc):
 
 
 def add_index(doc):
+
     raise NotImplementedError("Index addition not implemented")
 
 
 if __name__ == "__main__":
     doc = fitz.open(TEXTBOOK)
+    add_page_numbers(TEXTBOOK)
+
     try:
-        add_page_numbers(doc)
+        add_page_numbers(INPUT)
     except Error as e:
         logging.info(e)
         raise Exception("Page number addition failed")
@@ -63,9 +77,10 @@ if __name__ == "__main__":
     except Error as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
-
+    """
     try:
         add_index(doc)
     except Error as e:
         logging.info(e)
         raise Exception("Index addition failed")
+    """
