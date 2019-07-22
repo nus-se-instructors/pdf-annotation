@@ -17,6 +17,7 @@ import logging
 import fitz
 import os
 from pylovepdf.tools.pagenumber import Pagenumber
+from collections import defaultdict
 
 
 OUTPUT_FOLDER = "./outputs"
@@ -58,29 +59,54 @@ def add_toc(doc):
 
 
 def add_index(doc):
+    import spacy
 
-    raise NotImplementedError("Index addition not implemented")
+    nlp = spacy.load("en_core_web_sm")
+    output_dict = defaultdict(list)
+    for page_number in range(doc.pageCount):
+        page_text = doc.getPageText(page_number)
+        parsed_doc = nlp(page_text)
+        # Stem and lemmatize
+        proper_word = (
+            lambda x: x.pos_ != "PUNCT"
+            and x.pos_ != "VERB"
+            and x.text.isalpha()
+            and x.pos_ != "DET"
+            and x.pos != "ADV"
+        )
+        for word in parsed_doc:
+            if word.is_stop == False and proper_word(word):
+                output_dict[word.lemma_].append(page_number)
+    # Arbitrary filtering conditions
+    output_dict = {
+        k: v
+        for k, v in output_dict.items()
+        if (len(k) > 4 and len(v) <= 6 and len(k) <= 10 and "ly" not in k)
+    }
+    return output_dict
 
 
 if __name__ == "__main__":
     doc = fitz.open(TEXTBOOK)
-    add_page_numbers(TEXTBOOK)
 
+    """
     try:
-        add_page_numbers(INPUT)
+        add_page_numbers(TEXTBOOK)
     except Error as e:
         logging.info(e)
         raise Exception("Page number addition failed")
+    """
 
+    """
     try:
         add_toc(doc)
     except Error as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
     """
+
     try:
         add_index(doc)
     except Error as e:
         logging.info(e)
         raise Exception("Index addition failed")
-    """
