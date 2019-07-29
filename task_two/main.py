@@ -76,7 +76,7 @@ def generate_index_entries(doc):
         )
         for word in parsed_doc:
             if word.is_stop == False and proper_word(word):
-                output_dict[word.lemma_].append(page_number)
+                output_dict[word.lemma_].append(page_number + 1)
     # Arbitrary filtering conditions
     output_dict = {
         k: v
@@ -86,65 +86,74 @@ def generate_index_entries(doc):
     return output_dict
 
 
-def generate_index_page():
-    import beautifulsoup as bs4
+def generate_content_page():
+    textbook_website = (
+        "https://nus-cs2103-ay1920s1.github.io/website/se-book-adapted/print.html"
+    )
+    from urllib.request import urlopen
+    from bs4 import BeautifulSoup
 
+    html = urlopen(textbook_website)
+    bs = BeautifulSoup(html, "html.parser")
+    titles = bs.find_all(["h1", "h2"])
+    res = []
+    for title in titles:
+        res.append(title.get("id"))
     # Get all the h1 tags with respective page numbers as tuples. Then do a 4 page indent. How do we know if we've found the word?
     # We use a window of +- 5 words if all five words match then they are the same. This isn't a gurantee but I guess it workds for nwo
     # Get all the h2 tags and then figure out a way to do meaningful comparison
+    return titles
 
-    pass
 
-
-def generate_content_page(output_dict, page_width, page_height):
+def generate_index_page(output_dict, page_width, page_height):
 
     doc = fitz.open()
     page = doc.newPage(height=page_height, width=page_width)
     horizontal_start_point = 40
-    vertical_start_point = 72
-    # Sort dictionary items
-    index_keys = sorted(output_dict.keys())
+    vertical_start_point = 45
+    index_keys = sorted(output_dict.keys(), key=lambda v: v.upper())
     number_of_entries = len(index_keys)
     row_item_counter = 0
-    row_item_counter_width = 8
-    items_per_column = 90
-    columns_per_page = 4
+    row_item_counter_height = 8
+    items_per_column = 110
+    columns_per_page = 5
     items_per_page = items_per_column * columns_per_page
     column_spacing = 125
+    column_item_counter = 1
     for item_counter in range(number_of_entries):
         row_item_counter += 1
         p = fitz.Point(
-            horizontal_start_point,
-            vertical_start_point + row_item_counter * row_item_counter_width,
-        )  # start point of 1st line
-        if item_counter % items_per_column == 0 and item_counter > items_per_column:
+            horizontal_start_point + column_item_counter * column_spacing,
+            vertical_start_point + row_item_counter * row_item_counter_height,
+        )
+        if row_item_counter % items_per_column == 0:
             row_item_counter = 0
-            horizontal_start_point += column_spacing
-        if item_counter % items_per_page == 0 and item_counter > items_per_page:
-            horizontal_start_point = 40
-            vertical_start_point = 50
+            column_item_counter += 1
+
+        if column_item_counter % columns_per_page == 0:
+            column_item_counter = 1
             row_item_counter = 0
+
             page = doc.newPage(width=page_width, height=page_height)
         index_word = index_keys[item_counter]
 
-        text = "%s %s" % (
-            index_word,
-            list(set(output_dict[index_word])),
-        )  # Add a comma after each item in the list. Since there is a maximum width of six items, space accordingly
+        text = "%s %s" % (index_word, list(set(output_dict[index_word])))
         rc = page.insertText(
             p,  # bottom-left of 1st char
             text,  # the text (honors '\n')
             fontname="helv",  # the default font
             fontsize=8,  # the default font size
-            rotate=0,  # also available: 90, 180, 270
+            rotate=0,
         )
 
-    # doc.save("text.pdf")
     return doc
 
 
 if __name__ == "__main__":
     doc = fitz.open(TEXTBOOK)
+    # content_page = generate_content_page()
+    # doc.insertPDF(content_page, start_at=0, links=True)
+
     page_width = int(doc[0].bound().width)
     page_height = int(doc[0].bound().height)
 
@@ -163,11 +172,12 @@ if __name__ == "__main__":
         logging.info(e)
         raise Exception("Bookmark addition 
     """
+
     try:
         output_dict = generate_index_entries(doc)
     except Error as e:
         logging.info(e)
         raise Exception("Index addition failed")
-    content_page = generate_content_page(output_dict, page_width, page_height)
-    doc.insertPDF(content_page, start_at=doc.pageCount, links=True)
+    index_page = generate_index_page(output_dict, page_width, page_height)
+    doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
     doc.save("text2.pdf")
