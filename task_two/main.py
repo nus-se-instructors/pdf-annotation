@@ -58,7 +58,7 @@ def add_toc(doc):
     return True
 
 
-def add_index(doc):
+def generate_index_entries(doc):
     import spacy
 
     nlp = spacy.load("en_core_web_sm")
@@ -86,8 +86,67 @@ def add_index(doc):
     return output_dict
 
 
+def generate_index_page():
+    import beautifulsoup as bs4
+
+    # Get all the h1 tags with respective page numbers as tuples. Then do a 4 page indent. How do we know if we've found the word?
+    # We use a window of +- 5 words if all five words match then they are the same. This isn't a gurantee but I guess it workds for nwo
+    # Get all the h2 tags and then figure out a way to do meaningful comparison
+
+    pass
+
+
+def generate_content_page(output_dict, page_width, page_height):
+
+    doc = fitz.open()
+    page = doc.newPage(height=page_height, width=page_width)
+    horizontal_start_point = 40
+    vertical_start_point = 72
+    # Sort dictionary items
+    index_keys = sorted(output_dict.keys())
+    number_of_entries = len(index_keys)
+    row_item_counter = 0
+    row_item_counter_width = 8
+    items_per_column = 90
+    columns_per_page = 4
+    items_per_page = items_per_column * columns_per_page
+    column_spacing = 125
+    for item_counter in range(number_of_entries):
+        row_item_counter += 1
+        p = fitz.Point(
+            horizontal_start_point,
+            vertical_start_point + row_item_counter * row_item_counter_width,
+        )  # start point of 1st line
+        if item_counter % items_per_column == 0 and item_counter > items_per_column:
+            row_item_counter = 0
+            horizontal_start_point += column_spacing
+        if item_counter % items_per_page == 0 and item_counter > items_per_page:
+            horizontal_start_point = 40
+            vertical_start_point = 50
+            row_item_counter = 0
+            page = doc.newPage(width=page_width, height=page_height)
+        index_word = index_keys[item_counter]
+
+        text = "%s %s" % (
+            index_word,
+            list(set(output_dict[index_word])),
+        )  # Add a comma after each item in the list. Since there is a maximum width of six items, space accordingly
+        rc = page.insertText(
+            p,  # bottom-left of 1st char
+            text,  # the text (honors '\n')
+            fontname="helv",  # the default font
+            fontsize=8,  # the default font size
+            rotate=0,  # also available: 90, 180, 270
+        )
+
+    # doc.save("text.pdf")
+    return doc
+
+
 if __name__ == "__main__":
     doc = fitz.open(TEXTBOOK)
+    page_width = int(doc[0].bound().width)
+    page_height = int(doc[0].bound().height)
 
     """
     try:
@@ -102,11 +161,13 @@ if __name__ == "__main__":
         add_toc(doc)
     except Error as e:
         logging.info(e)
-        raise Exception("Bookmark addition failed")
+        raise Exception("Bookmark addition 
     """
-
     try:
-        add_index(doc)
+        output_dict = generate_index_entries(doc)
     except Error as e:
         logging.info(e)
         raise Exception("Index addition failed")
+    content_page = generate_content_page(output_dict, page_width, page_height)
+    doc.insertPDF(content_page, start_at=doc.pageCount, links=True)
+    doc.save("text2.pdf")
