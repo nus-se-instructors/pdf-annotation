@@ -14,8 +14,10 @@ import logging
 # How to muck around with PDFs:
 # https://automatetheboringstuff.com/chapter13/
 
+import bs4
 import fitz
 import os
+
 from pylovepdf.tools.pagenumber import Pagenumber
 from collections import defaultdict
 
@@ -43,6 +45,7 @@ def add_toc(doc):
     SECTION_DELIMITER = "SECTION: "
     LEVEL = 2
     # Initial level one heading
+    toc_headers = []
     toc = [[1, "Textbook", 0]]
     for page_number in range(doc.pageCount):
         page_text = doc.getPageText(page_number)
@@ -52,10 +55,12 @@ def add_toc(doc):
             logging.info("Section title is %s" % section_title)
             # Adjust for the fact that pages are 0 indexed
             toc.append([LEVEL, section_title, page_number + 1])
+            toc_headers.append(section_title)
     logging.info("The items in the table of contents are:" % toc)
     doc.setToC(toc)
+    # Append the content page to the front of the document
     doc.save(OUTPUT)
-    return True
+    return toc_headers
 
 
 def generate_index_entries(doc):
@@ -86,20 +91,79 @@ def generate_index_entries(doc):
     return output_dict
 
 
-def generate_content_page():
+def generate_content_page(headers_and_subheaders, page_height, page_width):
+    # Open The document
+    # for k,v in headers_and_subheaders.items():
+    # Print k
+    # Then for item in v indent and then print
+    # Return the document
+    # Create New page
+    doc = fitz.open()
+    page = doc.newPage(height=page_height, width=page_width)
+    horizontal_start_point = 40
+    vertical_start_point = 60
+    spacing = 15
+    num_lines = 0
+    tab = 30
+    total_length = 70
+    REDUNDANT_WORDS = ["Introduction", "More", "Self-Directed", "Aug '19", "Guideline:"]
+    for h1_item, h2_items in headers_and_subheaders.items():
+
+        # Insert the h1_item
+
+        p = fitz.Point(
+            horizontal_start_point, vertical_start_point + num_lines * spacing
+        )
+        page.insertText(p, h1_item, fontname="helv", fontsize=24, rotate=0)
+        num_lines += 2
+        for h2_item in h2_items:
+            if any(word in h2_item for word in REDUNDANT_WORDS):
+                continue
+            p_tab = fitz.Point(
+                tab + horizontal_start_point, vertical_start_point + num_lines * spacing
+            )
+            page.insertText(p_tab, h2_item, fontname="helv", fontsize=16, rotate=0)
+            num_lines += 1
+        num_lines += 2
+        if num_lines >= 45:
+            page = doc.newPage(height=page_height, width=page_width)
+            horizontal_start_point = 40
+            vertical_start_point = 60
+            num_lines = 0
+
+    return doc
+
+
+def get_headers_and_subheaders():
     textbook_website = (
         "https://nus-cs2103-ay1920s1.github.io/website/se-book-adapted/print.html"
     )
     from urllib.request import urlopen
-    from bs4 import BeautifulSoup
+
+    from collections import defaultdict
+
+    headers_and_subheaders = defaultdict(list)
 
     html = urlopen(textbook_website)
-    bs = BeautifulSoup(html, "html.parser")
+    bs = bs4.BeautifulSoup(html, "html.parser")
     titles = bs.find_all(["h1", "h2"])
     res = []
+    is_new_section = lambda x: x and "SECTION: " in x
+    section = ""
+    # Find the list of h1 and h2 tags
+    # If you encounter a h1 tag then append a h2
     for title in titles:
-        res.append(title.get("id"))
-    return titles
+        for child in title.children:
+            if is_new_section(child.string):
+                section = child.string.replace("SECTION: ", "")
+                continue
+            if (
+                type(child) is not bs4.element.NavigableString
+                and child.string is not None
+            ):
+                headers_and_subheaders[section].append(child.string)
+
+    return headers_and_subheaders
 
 
 def generate_index_page(output_dict, page_width, page_height):
@@ -148,11 +212,15 @@ def generate_index_page(output_dict, page_width, page_height):
 
 if __name__ == "__main__":
     doc = fitz.open(TEXTBOOK)
-    # content_page = generate_content_page()
-    # doc.insertPDF(content_page, start_at=0, links=True)
 
     page_width = int(doc[0].bound().width)
     page_height = int(doc[0].bound().height)
+
+    headers_and_subs = get_headers_and_subheaders()
+    content_page = generate_content_page(headers_and_subs, page_height, page_width)
+    doc.insertPDF(content_page, start_at=0, links=True)
+    doc.save("text3.pdf")
+    exit(0)
 
     """
     try:
