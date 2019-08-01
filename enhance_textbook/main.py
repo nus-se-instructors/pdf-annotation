@@ -103,10 +103,21 @@ def generate_content_page(headers_and_subheaders, page_height, page_width):
     horizontal_start_point = 40
     vertical_start_point = 60
     spacing = 15
-    num_lines = 0
+    num_lines = 1
     tab = 30
     total_length = 70
-    REDUNDANT_WORDS = ["Introduction", "More", "Self-Directed", "Aug '19", "Guideline:"]
+    REDUNDANT_WORDS = [
+        "Introduction",
+        "More",
+        "Self-Directed",
+        "Aug '19",
+        "Guideline:",
+        "PersonOverviewController",
+    ]
+    p = fitz.Point(
+        horizontal_start_point + 250, vertical_start_point + num_lines * spacing
+    )
+    page.insertText(p, "Table of Contents", fontname="helv", fontsize=32)
     for h1_item, h2_items in headers_and_subheaders.items():
 
         # Insert the h1_item
