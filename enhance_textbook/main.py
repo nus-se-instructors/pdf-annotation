@@ -230,31 +230,24 @@ if __name__ == "__main__":
     headers_and_subs = get_headers_and_subheaders()
     content_page = generate_content_page(headers_and_subs, page_height, page_width)
     doc.insertPDF(content_page, start_at=0, links=True)
-    doc.save("text3.pdf")
-    exit(0)
 
-    """
     try:
         add_toc(doc)
     except Error as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
-    """
 
     try:
         output_dict = generate_index_entries(doc)
     except Error as e:
         logging.info(e)
         raise Exception("Index addition failed")
+    index_page = generate_index_page(output_dict, page_width, page_height)
+    doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
+    doc.save(OUTPUT)
 
-    """
     try:
-        add_page_numbers(TEXTBOOK)
+        add_page_numbers(OUTPUT)
     except Error as e:
         logging.info(e)
         raise Exception("Page number addition failed")
-    """
-
-    index_page = generate_index_page(output_dict, page_width, page_height)
-    doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
-    doc.save("text2.pdf")
