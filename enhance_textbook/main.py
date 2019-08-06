@@ -119,6 +119,7 @@ def generate_content_page(headers_and_subheaders, page_height, page_width):
         "Aug '19",
         "Guideline:",
         "PersonOverviewController",
+        "CS2103",
     ]
     p = fitz.Point(
         horizontal_start_point + 250, vertical_start_point + num_lines * spacing
@@ -163,7 +164,7 @@ def get_headers_and_subheaders():
 
     html = urlopen(textbook_website)
     bs = bs4.BeautifulSoup(html, "html.parser")
-    titles = bs.find_all(["h1", "h2"])
+    titles = bs.find_all(["h1"])
     res = []
     is_new_section = lambda x: x and "SECTION: " in x
     section = ""
