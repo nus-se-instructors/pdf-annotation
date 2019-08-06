@@ -30,9 +30,15 @@ DEFAULT_ERROR_MESSAGE = "%s phase failed"
 PUBLIC_KEY = "project_public_36e2b8c0ce3c0d29905ab7acecbd1174_EwMDq1a590e7848c9bb7f57fd2429741123c9"
 
 
+class PagenumberHorizontal(Pagenumber):
+    def __init__(self, PUBLIC_KEY, verify_ssl):
+        Pagenumber.__init__(self, PUBLIC_KEY, verify_ssl)
+        self.horizontal_position = "right"
+
+
 def add_page_numbers(filename):
 
-    t = Pagenumber(PUBLIC_KEY, verify_ssl=True)
+    t = PagenumberHorizontal(PUBLIC_KEY, verify_ssl=True)
     t.add_file(filename)
     t.debug = False
     t.set_output_folder(OUTPUT_FOLDER)
@@ -233,13 +239,13 @@ if __name__ == "__main__":
 
     try:
         add_toc(doc)
-    except Error as e:
+    except Exception as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
 
     try:
         output_dict = generate_index_entries(doc)
-    except Error as e:
+    except Exception as e:
         logging.info(e)
         raise Exception("Index addition failed")
     index_page = generate_index_page(output_dict, page_width, page_height)
@@ -248,6 +254,6 @@ if __name__ == "__main__":
 
     try:
         add_page_numbers(OUTPUT)
-    except Error as e:
+    except Exception as e:
         logging.info(e)
         raise Exception("Page number addition failed")
