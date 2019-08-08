@@ -28,6 +28,9 @@ OVERLAY = os.path.join(OUTPUT_FOLDER, "overlay.pdf")
 OUTPUT = os.path.join(OUTPUT_FOLDER, "textbook_output.pdf")
 DEFAULT_ERROR_MESSAGE = "%s phase failed"
 PUBLIC_KEY = "project_public_36e2b8c0ce3c0d29905ab7acecbd1174_EwMDq1a590e7848c9bb7f57fd2429741123c9"
+TEXTBOOK_WEBSITE = (
+    "https://nus-cs2103-ay1920s1.github.io/website/se-book-adapted/print.html"
+)
 
 
 class PagenumberHorizontal(Pagenumber):
@@ -153,16 +156,13 @@ def generate_content_page(headers_and_subheaders, page_height, page_width):
 
 
 def get_headers_and_subheaders():
-    textbook_website = (
-        "https://nus-cs2103-ay1920s1.github.io/website/se-book-adapted/print.html"
-    )
     from urllib.request import urlopen
 
     from collections import defaultdict
 
     headers_and_subheaders = defaultdict(list)
 
-    html = urlopen(textbook_website)
+    html = urlopen(TEXTBOOK_WEBSITE)
     bs = bs4.BeautifulSoup(html, "html.parser")
     titles = bs.find_all(["h1"])
     res = []
@@ -243,12 +243,13 @@ if __name__ == "__main__":
     except Exception as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
-
+    """
     try:
         output_dict = generate_index_entries(doc)
     except Exception as e:
         logging.info(e)
         raise Exception("Index addition failed")
+    """
     index_page = generate_index_page(output_dict, page_width, page_height)
     doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
     doc.save(OUTPUT)
