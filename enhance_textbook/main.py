@@ -99,7 +99,9 @@ def generate_index_entries(doc):
     return output_dict
 
 
-def generate_content_page(headers_and_subheaders, page_height, page_width):
+def generate_content_page(
+    header_to_pagenumber, headers_and_subheaders, page_height, page_width
+):
     doc = fitz.open()
     page = doc.newPage(height=page_height, width=page_width)
     horizontal_start_point = 40
@@ -137,6 +139,18 @@ def generate_content_page(headers_and_subheaders, page_height, page_width):
                 tab + horizontal_start_point, vertical_start_point + num_lines * spacing
             )
             page.insertText(p_tab, h2_item, fontname="helv", fontsize=16, rotate=0)
+            p_tab_number = fitz.Point(
+                tab + horizontal_start_point + 500,
+                vertical_start_point + num_lines * spacing,
+            )
+            page.insertText(
+                p_tab_number,
+                str(header_to_pagenumber[h2_item]),
+                fontname="helv",
+                fontsize=16,
+                rotate=0,
+            )
+
             # TODO: If the mapping exists then move horizontally by 500 and then print that page number
             num_lines += 1
         num_lines += 2
@@ -242,8 +256,6 @@ def get_page_number(doc):
             if word in page_text and lower_bound[word] == 0:
                 lower_bound[word] = page_number
 
-    # Find a lower bound for each number
-
     for page_number in range(doc.pageCount):
         page_text = doc.getPageText(page_number)
         for L1_header, L2_header in headers_and_subheaders.items():
@@ -253,9 +265,8 @@ def get_page_number(doc):
                 if word in page_text and page_number >= lower_page_bound:
                     header_to_pagenumber[word] = page_number + num_content_pages + 1
                     L2_header.remove(word)
-    import pdb
-
-    pdb.set_trace()
+    # HARDCODED to handle Java case
+    header_to_pagenumber["Java"] = 144
     return header_to_pagenumber
 
 
@@ -265,9 +276,11 @@ if __name__ == "__main__":
     page_width = int(doc[0].bound().width)
     page_height = int(doc[0].bound().height)
 
-    cbp = get_page_number(doc)
+    header_to_pagenumber = get_page_number(doc)
     headers_and_subs = get_headers_and_subheaders()
-    content_page = generate_content_page(headers_and_subs, page_height, page_width)
+    content_page = generate_content_page(
+        header_to_pagenumber, headers_and_subs, page_height, page_width
+    )
     doc.insertPDF(content_page, start_at=0, links=True)
 
     try:
@@ -287,12 +300,11 @@ if __name__ == "__main__":
 
     doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
     """
-    doc.save(OUTPUT)
+    # doc.save(OUTPUT)
 
-    """
     try:
         add_page_numbers(OUTPUT)
     except Exception as e:
         logging.info(e)
         raise Exception("Page number addition failed")
-    """
+    doc.save(OUTPUT)
