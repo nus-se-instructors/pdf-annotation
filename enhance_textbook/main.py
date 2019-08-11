@@ -80,7 +80,6 @@ def generate_index_entries(doc):
     for page_number in range(doc.pageCount):
         page_text = doc.getPageText(page_number)
         parsed_doc = nlp(page_text)
-        # Stem and lemmatize
         proper_word = (
             lambda x: x.pos_ != "PUNCT"
             and x.pos_ != "VERB"
@@ -101,12 +100,6 @@ def generate_index_entries(doc):
 
 
 def generate_content_page(headers_and_subheaders, page_height, page_width):
-    # Open The document
-    # for k,v in headers_and_subheaders.items():
-    # Print k
-    # Then for item in v indent and then print
-    # Return the document
-    # Create New page
     doc = fitz.open()
     page = doc.newPage(height=page_height, width=page_width)
     horizontal_start_point = 40
@@ -144,6 +137,7 @@ def generate_content_page(headers_and_subheaders, page_height, page_width):
                 tab + horizontal_start_point, vertical_start_point + num_lines * spacing
             )
             page.insertText(p_tab, h2_item, fontname="helv", fontsize=16, rotate=0)
+            # TODO: If the mapping exists then move horizontally by 500 and then print that page number
             num_lines += 1
         num_lines += 2
         if num_lines >= 45:
@@ -155,7 +149,8 @@ def generate_content_page(headers_and_subheaders, page_height, page_width):
     return doc
 
 
-def get_headers_and_subheaders():
+def get_headers_and_subheaders(tags=["h1"]):
+
     from urllib.request import urlopen
 
     from collections import defaultdict
@@ -164,7 +159,7 @@ def get_headers_and_subheaders():
 
     html = urlopen(TEXTBOOK_WEBSITE)
     bs = bs4.BeautifulSoup(html, "html.parser")
-    titles = bs.find_all(["h1"])
+    titles = bs.find_all(tags)
     res = []
     is_new_section = lambda x: x and "SECTION: " in x
     section = ""
@@ -228,12 +223,49 @@ def generate_index_page(output_dict, page_width, page_height):
     return doc
 
 
+def get_page_number(doc):
+    """
+    returns a dictionary mapping of header to page number
+    """
+
+    headers_and_subheaders = get_headers_and_subheaders(tags=["h1"])
+    header_to_pagenumber = defaultdict()
+    num_content_pages = 2
+    lower_bound = defaultdict(int)
+    keyword_list = []
+    for key, value in get_headers_and_subheaders().items():
+        keyword_list.append("SECTION: " + key)
+
+    for page_number in range(doc.pageCount):
+        page_text = doc.getPageText(page_number)
+        for word in keyword_list[1:]:
+            if word in page_text and lower_bound[word] == 0:
+                lower_bound[word] = page_number
+
+    # Find a lower bound for each number
+
+    for page_number in range(doc.pageCount):
+        page_text = doc.getPageText(page_number)
+        for L1_header, L2_header in headers_and_subheaders.items():
+            lower_page_bound = lower_bound["SECTION: " + L1_header]
+
+            for word in L2_header:
+                if word in page_text and page_number >= lower_page_bound:
+                    header_to_pagenumber[word] = page_number + num_content_pages + 1
+                    L2_header.remove(word)
+    import pdb
+
+    pdb.set_trace()
+    return header_to_pagenumber
+
+
 if __name__ == "__main__":
     doc = fitz.open(TEXTBOOK)
 
     page_width = int(doc[0].bound().width)
     page_height = int(doc[0].bound().height)
 
+    cbp = get_page_number(doc)
     headers_and_subs = get_headers_and_subheaders()
     content_page = generate_content_page(headers_and_subs, page_height, page_width)
     doc.insertPDF(content_page, start_at=0, links=True)
@@ -243,19 +275,24 @@ if __name__ == "__main__":
     except Exception as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
+
     """
     try:
         output_dict = generate_index_entries(doc)
     except Exception as e:
         logging.info(e)
         raise Exception("Index addition failed")
-    """
+    
     index_page = generate_index_page(output_dict, page_width, page_height)
+
     doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
+    """
     doc.save(OUTPUT)
 
+    """
     try:
         add_page_numbers(OUTPUT)
     except Exception as e:
         logging.info(e)
         raise Exception("Page number addition failed")
+    """
