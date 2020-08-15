@@ -19,8 +19,8 @@ import fitz
 import os
 
 from pylovepdf.tools.pagenumber import Pagenumber
-from collections import defaultdict
-
+from collections import defaultdict, OrderedDict
+from urllib.request import urlopen
 
 OUTPUT_FOLDER = "./outputs"
 TEXTBOOK = "./inputs/textbook.pdf"
@@ -164,12 +164,10 @@ def generate_content_page(
 
 
 def get_headers_and_subheaders(tags=["h1"]):
-
-    from urllib.request import urlopen
-
-    from collections import defaultdict
-
-    headers_and_subheaders = defaultdict(list)
+    """
+    Generates an ordered dictionary of L1 headers mapped to L2 headers
+    """
+    headers_and_subheaders = OrderedDict()
 
     html = urlopen(TEXTBOOK_WEBSITE)
     bs = bs4.BeautifulSoup(html, "html.parser")
@@ -188,7 +186,10 @@ def get_headers_and_subheaders(tags=["h1"]):
                 type(child) is not bs4.element.NavigableString
                 and child.string is not None
             ):
-                headers_and_subheaders[section].append(child.string)
+                if headers_and_subheaders.get(section):
+                    headers_and_subheaders[section].append(child.string)
+                else:
+                    headers_and_subheaders[section] = [child.string]
 
     return headers_and_subheaders
 
@@ -239,35 +240,36 @@ def generate_index_page(output_dict, page_width, page_height):
 
 def get_page_number(doc):
     """
-    returns a dictionary mapping of header to page number
+    Returns a dictionary mapping of header to page number
     """
 
     headers_and_subheaders = get_headers_and_subheaders(tags=["h1"])
-    header_to_pagenumber = defaultdict()
-    num_content_pages = 2
-    lower_bound = defaultdict(int)
-    keyword_list = []
-    for key, value in get_headers_and_subheaders().items():
-        keyword_list.append("SECTION: " + key)
+    header_to_pagenumber = {}
 
-    for page_number in range(doc.pageCount):
-        page_text = doc.getPageText(page_number)
-        for word in keyword_list[1:]:
-            if word in page_text and lower_bound[word] == 0:
-                lower_bound[word] = page_number
+    page_num = 1
+    for L1_header, L2_headers in headers_and_subheaders.items():
+        if not L1_header:
+            continue
+        # First locate the L1 header
+        page_num = locate("SECTION: " + L1_header, doc, page_num)
+        header_to_pagenumber[L1_header] = page_num
 
-    for page_number in range(doc.pageCount):
-        page_text = doc.getPageText(page_number)
-        for L1_header, L2_header in headers_and_subheaders.items():
-            lower_page_bound = lower_bound["SECTION: " + L1_header]
+        # Then locate each L2 header
+        for L2_header in L2_headers:
+            # Add newline character to prevent matching inline occurrences of the header
+            page_num = locate(L2_header + "\n", doc, page_num)
+            header_to_pagenumber[L2_header] = page_num
 
-            for word in L2_header:
-                if word in page_text and page_number >= lower_page_bound:
-                    header_to_pagenumber[word] = page_number + num_content_pages + 1
-                    L2_header.remove(word)
-    # HARDCODED to handle Java case
-    header_to_pagenumber["Java"] = 144
     return header_to_pagenumber
+
+
+def locate(keyword, doc, page_num):
+    """
+    Searches for the given keyword in the doc starting from a specified page number
+    """
+    while keyword not in doc.getPageText(page_num - 1) and page_num < doc.pageCount:
+        page_num += 1
+    return page_num
 
 
 if __name__ == "__main__":
