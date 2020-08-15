@@ -22,6 +22,8 @@ from pylovepdf.tools.pagenumber import Pagenumber
 from collections import defaultdict, OrderedDict
 from urllib.request import urlopen
 
+from downloader import Downloader
+
 OUTPUT_FOLDER = "./outputs"
 TEXTBOOK = "./inputs/textbook.pdf"
 OVERLAY = os.path.join(OUTPUT_FOLDER, "overlay.pdf")
@@ -273,6 +275,13 @@ def locate(keyword, doc, page_num):
 
 
 if __name__ == "__main__":
+    downloader = Downloader(TEXTBOOK_WEBSITE)
+    try:
+        downloader.download_to(TEXTBOOK)
+    except Exception as e:
+        logging.info(e)
+        print("Download failed, using existing copy of textbook")
+
     doc = fitz.open(TEXTBOOK)
 
     page_width = int(doc[0].bound().width)
@@ -302,11 +311,5 @@ if __name__ == "__main__":
 
     doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
     """
-    # doc.save(OUTPUT)
 
-    try:
-        add_page_numbers(OUTPUT)
-    except Exception as e:
-        logging.info(e)
-        raise Exception("Page number addition failed")
     doc.save(OUTPUT)
