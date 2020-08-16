@@ -1,5 +1,3 @@
-import logging
-
 # Add Page numbers
 # https://stackoverflow.com/questions/25164871/how-to-add-page-numbers-to-pdf-file-using-python-and-matplotlib
 
@@ -17,6 +15,7 @@ import logging
 import bs4
 import fitz
 import os
+import logging
 
 from collections import defaultdict, OrderedDict
 from urllib.request import urlopen
@@ -31,10 +30,10 @@ DEFAULT_ERROR_MESSAGE = "%s phase failed"
 TEXTBOOK_WEBSITE = (
     "https://nus-cs2103-ay1920s1.github.io/website/se-book-adapted/print.html"
 )
+SECTION_DELIMITER = "SECTION: "
 
 
 def add_toc(doc):
-    SECTION_DELIMITER = "SECTION: "
     LEVEL = 2
     # Initial level one heading
     toc_headers = []
@@ -93,7 +92,7 @@ def generate_content_page(
     num_lines = 1
     tab = 30
     total_length = 70
-    REDUNDANT_WORDS = [
+    REDUNDANT_WORDS = {
         "Introduction",
         "More",
         "Self-Directed",
@@ -101,7 +100,7 @@ def generate_content_page(
         "Guideline:",
         "PersonOverviewController",
         "CS2103",
-    ]
+    }
     p = fitz.Point(
         horizontal_start_point + 250, vertical_start_point + num_lines * spacing
     )
@@ -155,15 +154,13 @@ def get_headers_and_subheaders(tags=["h1"]):
     html = urlopen(TEXTBOOK_WEBSITE)
     bs = bs4.BeautifulSoup(html, "html.parser")
     titles = bs.find_all(tags)
-    res = []
-    is_new_section = lambda x: x and "SECTION: " in x
     section = ""
     # Find the list of h1 and h2 tags
     # If you encounter a h1 tag then append a h2
     for title in titles:
         for child in title.children:
             if is_new_section(child.string):
-                section = child.string.replace("SECTION: ", "")
+                section = child.string.replace(SECTION_DELIMITER, "")
                 continue
             if (
                 type(child) is not bs4.element.NavigableString
@@ -177,8 +174,11 @@ def get_headers_and_subheaders(tags=["h1"]):
     return headers_and_subheaders
 
 
-def generate_index_page(output_dict, page_width, page_height):
+def is_new_section(header):
+    return header and SECTION_DELIMITER in header
 
+
+def generate_index_page(output_dict, page_width, page_height):
     doc = fitz.open()
     page = doc.newPage(height=page_height, width=page_width)
     horizontal_start_point = 40
@@ -189,7 +189,6 @@ def generate_index_page(output_dict, page_width, page_height):
     row_item_counter_height = 8
     items_per_column = 110
     columns_per_page = 5
-    items_per_page = items_per_column * columns_per_page
     column_spacing = 125
     column_item_counter = 1
     for item_counter in range(number_of_entries):
@@ -210,7 +209,7 @@ def generate_index_page(output_dict, page_width, page_height):
         index_word = index_keys[item_counter]
 
         text = "%s %s" % (index_word, list(set(output_dict[index_word])))
-        rc = page.insertText(
+        page.insertText(
             p,  # bottom-left of 1st char
             text,  # the text (honors '\n')
             fontname="helv",  # the default font
@@ -225,7 +224,6 @@ def get_page_number(doc):
     """
     Returns a dictionary mapping of header to page number
     """
-
     headers_and_subheaders = get_headers_and_subheaders(tags=["h1"])
     header_to_pagenumber = {}
 
@@ -234,7 +232,7 @@ def get_page_number(doc):
         if not L1_header:
             continue
         # First locate the L1 header
-        page_num = locate("SECTION: " + L1_header, doc, page_num)
+        page_num = locate(SECTION_DELIMITER + L1_header, doc, page_num)
         header_to_pagenumber[L1_header] = page_num
 
         # Then locate each L2 header
