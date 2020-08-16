@@ -18,7 +18,6 @@ import bs4
 import fitz
 import os
 
-from pylovepdf.tools.pagenumber import Pagenumber
 from collections import defaultdict, OrderedDict
 from urllib.request import urlopen
 
@@ -29,27 +28,9 @@ TEXTBOOK = "./inputs/textbook.pdf"
 OVERLAY = os.path.join(OUTPUT_FOLDER, "overlay.pdf")
 OUTPUT = os.path.join(OUTPUT_FOLDER, "textbook_output.pdf")
 DEFAULT_ERROR_MESSAGE = "%s phase failed"
-PUBLIC_KEY = "project_public_36e2b8c0ce3c0d29905ab7acecbd1174_EwMDq1a590e7848c9bb7f57fd2429741123c9"
 TEXTBOOK_WEBSITE = (
     "https://nus-cs2103-ay1920s1.github.io/website/se-book-adapted/print.html"
 )
-
-
-class PagenumberHorizontal(Pagenumber):
-    def __init__(self, PUBLIC_KEY, verify_ssl):
-        Pagenumber.__init__(self, PUBLIC_KEY, verify_ssl)
-        self.horizontal_position = "right"
-
-
-def add_page_numbers(filename):
-
-    t = PagenumberHorizontal(PUBLIC_KEY, verify_ssl=True)
-    t.add_file(filename)
-    t.debug = False
-    t.set_output_folder(OUTPUT_FOLDER)
-    t.execute()
-    t.download()
-    return True
 
 
 def add_toc(doc):
