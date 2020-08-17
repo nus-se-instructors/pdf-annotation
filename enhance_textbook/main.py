@@ -1,5 +1,3 @@
-import logging
-
 # Add Page numbers
 # https://stackoverflow.com/questions/25164871/how-to-add-page-numbers-to-pdf-file-using-python-and-matplotlib
 
@@ -17,41 +15,25 @@ import logging
 import bs4
 import fitz
 import os
+import logging
 
-from pylovepdf.tools.pagenumber import Pagenumber
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
+from urllib.request import urlopen
 
+from downloader import Downloader
 
 OUTPUT_FOLDER = "./outputs"
 TEXTBOOK = "./inputs/textbook.pdf"
 OVERLAY = os.path.join(OUTPUT_FOLDER, "overlay.pdf")
 OUTPUT = os.path.join(OUTPUT_FOLDER, "textbook_output.pdf")
 DEFAULT_ERROR_MESSAGE = "%s phase failed"
-PUBLIC_KEY = "project_public_36e2b8c0ce3c0d29905ab7acecbd1174_EwMDq1a590e7848c9bb7f57fd2429741123c9"
 TEXTBOOK_WEBSITE = (
     "https://nus-cs2103-ay1920s1.github.io/website/se-book-adapted/print.html"
 )
-
-
-class PagenumberHorizontal(Pagenumber):
-    def __init__(self, PUBLIC_KEY, verify_ssl):
-        Pagenumber.__init__(self, PUBLIC_KEY, verify_ssl)
-        self.horizontal_position = "right"
-
-
-def add_page_numbers(filename):
-
-    t = PagenumberHorizontal(PUBLIC_KEY, verify_ssl=True)
-    t.add_file(filename)
-    t.debug = False
-    t.set_output_folder(OUTPUT_FOLDER)
-    t.execute()
-    t.download()
-    return True
+SECTION_DELIMITER = "SECTION: "
 
 
 def add_toc(doc):
-    SECTION_DELIMITER = "SECTION: "
     LEVEL = 2
     # Initial level one heading
     toc_headers = []
@@ -110,7 +92,7 @@ def generate_content_page(
     num_lines = 1
     tab = 30
     total_length = 70
-    REDUNDANT_WORDS = [
+    REDUNDANT_WORDS = {
         "Introduction",
         "More",
         "Self-Directed",
@@ -118,7 +100,7 @@ def generate_content_page(
         "Guideline:",
         "PersonOverviewController",
         "CS2103",
-    ]
+    }
     p = fitz.Point(
         horizontal_start_point + 250, vertical_start_point + num_lines * spacing
     )
@@ -164,37 +146,39 @@ def generate_content_page(
 
 
 def get_headers_and_subheaders(tags=["h1"]):
-
-    from urllib.request import urlopen
-
-    from collections import defaultdict
-
-    headers_and_subheaders = defaultdict(list)
+    """
+    Generates an ordered dictionary of L1 headers mapped to L2 headers
+    """
+    headers_and_subheaders = OrderedDict()
 
     html = urlopen(TEXTBOOK_WEBSITE)
     bs = bs4.BeautifulSoup(html, "html.parser")
     titles = bs.find_all(tags)
-    res = []
-    is_new_section = lambda x: x and "SECTION: " in x
     section = ""
     # Find the list of h1 and h2 tags
     # If you encounter a h1 tag then append a h2
     for title in titles:
         for child in title.children:
             if is_new_section(child.string):
-                section = child.string.replace("SECTION: ", "")
+                section = child.string.replace(SECTION_DELIMITER, "")
                 continue
             if (
                 type(child) is not bs4.element.NavigableString
                 and child.string is not None
             ):
-                headers_and_subheaders[section].append(child.string)
+                if headers_and_subheaders.get(section):
+                    headers_and_subheaders[section].append(child.string)
+                else:
+                    headers_and_subheaders[section] = [child.string]
 
     return headers_and_subheaders
 
 
-def generate_index_page(output_dict, page_width, page_height):
+def is_new_section(header):
+    return header and SECTION_DELIMITER in header
 
+
+def generate_index_page(output_dict, page_width, page_height):
     doc = fitz.open()
     page = doc.newPage(height=page_height, width=page_width)
     horizontal_start_point = 40
@@ -205,7 +189,6 @@ def generate_index_page(output_dict, page_width, page_height):
     row_item_counter_height = 8
     items_per_column = 110
     columns_per_page = 5
-    items_per_page = items_per_column * columns_per_page
     column_spacing = 125
     column_item_counter = 1
     for item_counter in range(number_of_entries):
@@ -226,7 +209,7 @@ def generate_index_page(output_dict, page_width, page_height):
         index_word = index_keys[item_counter]
 
         text = "%s %s" % (index_word, list(set(output_dict[index_word])))
-        rc = page.insertText(
+        page.insertText(
             p,  # bottom-left of 1st char
             text,  # the text (honors '\n')
             fontname="helv",  # the default font
@@ -239,38 +222,45 @@ def generate_index_page(output_dict, page_width, page_height):
 
 def get_page_number(doc):
     """
-    returns a dictionary mapping of header to page number
+    Returns a dictionary mapping of header to page number
     """
-
     headers_and_subheaders = get_headers_and_subheaders(tags=["h1"])
-    header_to_pagenumber = defaultdict()
-    num_content_pages = 2
-    lower_bound = defaultdict(int)
-    keyword_list = []
-    for key, value in get_headers_and_subheaders().items():
-        keyword_list.append("SECTION: " + key)
+    header_to_pagenumber = {}
 
-    for page_number in range(doc.pageCount):
-        page_text = doc.getPageText(page_number)
-        for word in keyword_list[1:]:
-            if word in page_text and lower_bound[word] == 0:
-                lower_bound[word] = page_number
+    page_num = 1
+    for L1_header, L2_headers in headers_and_subheaders.items():
+        if not L1_header:
+            continue
+        # First locate the L1 header
+        page_num = locate(SECTION_DELIMITER + L1_header, doc, page_num)
+        header_to_pagenumber[L1_header] = page_num
 
-    for page_number in range(doc.pageCount):
-        page_text = doc.getPageText(page_number)
-        for L1_header, L2_header in headers_and_subheaders.items():
-            lower_page_bound = lower_bound["SECTION: " + L1_header]
+        # Then locate each L2 header
+        for L2_header in L2_headers:
+            # Add newline character to prevent matching inline occurrences of the header
+            page_num = locate(L2_header + "\n", doc, page_num)
+            header_to_pagenumber[L2_header] = page_num
 
-            for word in L2_header:
-                if word in page_text and page_number >= lower_page_bound:
-                    header_to_pagenumber[word] = page_number + num_content_pages + 1
-                    L2_header.remove(word)
-    # HARDCODED to handle Java case
-    header_to_pagenumber["Java"] = 144
     return header_to_pagenumber
 
 
+def locate(keyword, doc, page_num):
+    """
+    Searches for the given keyword in the doc starting from a specified page number
+    """
+    while keyword not in doc.getPageText(page_num - 1) and page_num < doc.pageCount:
+        page_num += 1
+    return page_num
+
+
 if __name__ == "__main__":
+    downloader = Downloader(TEXTBOOK_WEBSITE)
+    try:
+        downloader.download_to(TEXTBOOK)
+    except Exception as e:
+        logging.info(e)
+        print("Download failed, using existing copy of textbook")
+
     doc = fitz.open(TEXTBOOK)
 
     page_width = int(doc[0].bound().width)
@@ -300,11 +290,5 @@ if __name__ == "__main__":
 
     doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
     """
-    # doc.save(OUTPUT)
 
-    try:
-        add_page_numbers(OUTPUT)
-    except Exception as e:
-        logging.info(e)
-        raise Exception("Page number addition failed")
     doc.save(OUTPUT)
