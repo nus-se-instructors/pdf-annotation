@@ -34,7 +34,7 @@ TEXTBOOK_WEBSITE = (
 SECTION_DELIMITER = "SECTION: "
 
 
-def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages):
+def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages, allow_second_level=True):
     LEVEL_1 = 2
     LEVEL_2 = 3
     # Initial level one heading
@@ -42,9 +42,10 @@ def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages)
     # Add first-level headers
     for header, subheaders in headers_and_subs.items():
         toc.append([LEVEL_1, SECTION_DELIMITER + header, header_to_pagenumber[header] + no_content_pages])
-        # Add second-level headers
-        for subheader in subheaders:
-            toc.append([LEVEL_2, subheader, header_to_pagenumber[subheader] + no_content_pages])
+        if allow_second_level:
+            # Add second-level headers
+            for subheader in subheaders:
+                toc.append([LEVEL_2, subheader, header_to_pagenumber[subheader] + no_content_pages])
 
     logging.info("The items in the table of contents are:" % toc)
     # Save bookmarks
