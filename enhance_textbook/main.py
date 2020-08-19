@@ -83,16 +83,6 @@ def generate_content_page(
     spacing = 15
     num_lines = 1
     tab = 30
-    total_length = 70
-    REDUNDANT_WORDS = {
-        "Introduction",
-        "More",
-        "Self-Directed",
-        "Aug '19",
-        "Guideline:",
-        "PersonOverviewController",
-        "CS2103",
-    }
     p = fitz.Point(
         horizontal_start_point + 250, vertical_start_point + num_lines * spacing
     )
@@ -108,8 +98,6 @@ def generate_content_page(
         page.insertText(p, h1_item, fontname="helv", fontsize=24, rotate=0)
         num_lines += 2
         for h2_item in h2_items:
-            if any(word in h2_item for word in REDUNDANT_WORDS):
-                continue
             p_tab = fitz.Point(
                 tab + horizontal_start_point, vertical_start_point + num_lines * spacing
             )
@@ -224,8 +212,6 @@ def get_page_number(doc):
 
     page_num = 1
     for L1_header, L2_headers in headers_and_subheaders.items():
-        if not L1_header:
-            continue
         # First locate the L1 header
         page_num = locate(SECTION_DELIMITER + L1_header, doc, page_num)
         header_to_pagenumber[L1_header] = page_num
