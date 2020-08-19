@@ -16,6 +16,7 @@ import bs4
 import fitz
 import os
 import logging
+import sys
 
 from collections import defaultdict, OrderedDict
 from urllib.request import urlopen
@@ -93,42 +94,60 @@ def generate_content_page(
     )
     page.insertText(p, "Table of Contents", fontname="helv", fontsize=32)
     num_lines += 4
+
+    # Create a TextWriter (per page)
+    wr = fitz.TextWriter(page.rect)
     for h1_item, h2_items in headers_and_subheaders.items():
-
         # Insert the h1_item
-
         p = fitz.Point(
             horizontal_start_point, vertical_start_point + num_lines * spacing
         )
-        page.insertText(p, h1_item, fontname="helv", fontsize=24, rotate=0)
+        wr.append(p, h1_item, fontsize=24)
         num_lines += 2
         for h2_item in h2_items:
+            # Insert each h2_item
             p_tab = fitz.Point(
                 tab + horizontal_start_point, vertical_start_point + num_lines * spacing
             )
-            page.insertText(p_tab, h2_item, fontname="helv", fontsize=16, rotate=0)
+            wr.append(p_tab, h2_item, fontsize=16)
+
+            # Insert ... between h2_item and page number
             p_tab_number = fitz.Point(
                 tab + horizontal_start_point + 500,
                 vertical_start_point + num_lines * spacing,
             )
-            page.insertText(
-                p_tab_number,
-                str(header_to_pagenumber[h2_item]),
-                fontname="helv",
-                fontsize=16,
-                rotate=0,
-            )
+            add_dot_connector(wr, wr.lastPoint, p_tab_number)
 
-            # TODO: If the mapping exists then move horizontally by 500 and then print that page number
+            # Insert page number for h2_item
+            wr.append(p_tab_number, str(header_to_pagenumber[h2_item]), fontsize=16)
             num_lines += 1
-        num_lines += 2
-        if num_lines >= 45:
-            page = doc.newPage(height=page_height, width=page_width)
-            horizontal_start_point = 40
-            vertical_start_point = 60
-            num_lines = 0
 
+            # Move to new page if nearing end of page
+            if num_lines >= 45:
+                wr.writeText(page)
+                page = doc.newPage(height=page_height, width=page_width)
+                wr = fitz.TextWriter(page.rect)
+                num_lines = 0
+        num_lines += 2
+
+    wr.writeText(page)
     return doc
+
+
+def add_dot_connector(wr, start, end):
+    """
+    Adds ... between a startpoint and endpoint. Uses a workaround to suppress unnecessary pymupdf warnings about text
+    overflow. Credits for workaround: https://stackoverflow.com/a/8447352
+    """
+    sys.stdout = open(os.devnull, "w")
+
+    dot_connector = "." * 200
+    rect_topleft = fitz.Point(start.x, start.y - 15)
+    rect_bottomright = fitz.Point(end.x, end.y + 10)
+    rect = fitz.Rect(rect_topleft, rect_bottomright)
+    wr.fillTextbox(rect, dot_connector)
+
+    sys.stdout = sys.__stdout__
 
 
 def get_headers_and_subheaders(tags=["h1"]):
