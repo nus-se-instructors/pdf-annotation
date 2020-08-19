@@ -33,25 +33,17 @@ TEXTBOOK_WEBSITE = (
 SECTION_DELIMITER = "SECTION: "
 
 
-def add_toc(doc):
+def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages):
     LEVEL = 2
     # Initial level one heading
-    toc_headers = []
     toc = [[1, "Textbook", 0]]
-    for page_number in range(doc.pageCount):
-        page_text = doc.getPageText(page_number)
-        section_index = page_text.find(SECTION_DELIMITER)
-        if section_index != -1:
-            section_title = page_text[section_index:].split("\n")[0]
-            logging.info("Section title is %s" % section_title)
-            # Adjust for the fact that pages are 0 indexed
-            toc.append([LEVEL, section_title, page_number + 1])
-            toc_headers.append(section_title)
+    # Add Section Headers
+    for header in headers_and_subs.keys():
+        toc.append([LEVEL, SECTION_DELIMITER + header, header_to_pagenumber[header] + no_content_pages])
     logging.info("The items in the table of contents are:" % toc)
+    # Save bookmarks
     doc.setToC(toc)
-    # Append the content page to the front of the document
     doc.save(OUTPUT)
-    return toc_headers
 
 
 def generate_index_entries(doc):
@@ -105,6 +97,7 @@ def generate_content_page(
         horizontal_start_point + 250, vertical_start_point + num_lines * spacing
     )
     page.insertText(p, "Table of Contents", fontname="helv", fontsize=32)
+    num_lines += 4
     for h1_item, h2_items in headers_and_subheaders.items():
 
         # Insert the h1_item
@@ -166,11 +159,13 @@ def get_headers_and_subheaders(tags=["h1"]):
                 type(child) is not bs4.element.NavigableString
                 and child.string is not None
             ):
+                # Prevent addition of "" headers
+                if not section:
+                    continue
                 if headers_and_subheaders.get(section):
                     headers_and_subheaders[section].append(child.string)
                 else:
                     headers_and_subheaders[section] = [child.string]
-
     return headers_and_subheaders
 
 
@@ -274,7 +269,7 @@ if __name__ == "__main__":
     doc.insertPDF(content_page, start_at=0, links=True)
 
     try:
-        add_toc(doc)
+        add_bookmarks(doc, header_to_pagenumber, headers_and_subs, content_page.pageCount)
     except Exception as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
