@@ -16,6 +16,7 @@ import bs4
 import fitz
 import os
 import logging
+import sys
 
 from collections import defaultdict, OrderedDict
 from urllib.request import urlopen
@@ -33,25 +34,23 @@ TEXTBOOK_WEBSITE = (
 SECTION_DELIMITER = "SECTION: "
 
 
-def add_toc(doc):
-    LEVEL = 2
+def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages, allow_second_level=True):
+    LEVEL_1 = 2
+    LEVEL_2 = 3
     # Initial level one heading
-    toc_headers = []
     toc = [[1, "Textbook", 0]]
-    for page_number in range(doc.pageCount):
-        page_text = doc.getPageText(page_number)
-        section_index = page_text.find(SECTION_DELIMITER)
-        if section_index != -1:
-            section_title = page_text[section_index:].split("\n")[0]
-            logging.info("Section title is %s" % section_title)
-            # Adjust for the fact that pages are 0 indexed
-            toc.append([LEVEL, section_title, page_number + 1])
-            toc_headers.append(section_title)
+    # Add first-level headers
+    for header, subheaders in headers_and_subs.items():
+        toc.append([LEVEL_1, SECTION_DELIMITER + header, header_to_pagenumber[header] + no_content_pages])
+        if allow_second_level:
+            # Add second-level headers
+            for subheader in subheaders:
+                toc.append([LEVEL_2, subheader, header_to_pagenumber[subheader] + no_content_pages])
+
     logging.info("The items in the table of contents are:" % toc)
+    # Save bookmarks
     doc.setToC(toc)
-    # Append the content page to the front of the document
     doc.save(OUTPUT)
-    return toc_headers
 
 
 def generate_index_entries(doc):
@@ -91,58 +90,65 @@ def generate_content_page(
     spacing = 15
     num_lines = 1
     tab = 30
-    total_length = 70
-    REDUNDANT_WORDS = {
-        "Introduction",
-        "More",
-        "Self-Directed",
-        "Aug '19",
-        "Guideline:",
-        "PersonOverviewController",
-        "CS2103",
-    }
     p = fitz.Point(
         horizontal_start_point + 250, vertical_start_point + num_lines * spacing
     )
     page.insertText(p, "Table of Contents", fontname="helv", fontsize=32)
+    num_lines += 4
+
+    # Create a TextWriter (per page)
+    wr = fitz.TextWriter(page.rect)
     for h1_item, h2_items in headers_and_subheaders.items():
-
         # Insert the h1_item
-
         p = fitz.Point(
             horizontal_start_point, vertical_start_point + num_lines * spacing
         )
-        page.insertText(p, h1_item, fontname="helv", fontsize=24, rotate=0)
+        wr.append(p, h1_item, fontsize=24)
         num_lines += 2
         for h2_item in h2_items:
-            if any(word in h2_item for word in REDUNDANT_WORDS):
-                continue
+            # Insert each h2_item
             p_tab = fitz.Point(
                 tab + horizontal_start_point, vertical_start_point + num_lines * spacing
             )
-            page.insertText(p_tab, h2_item, fontname="helv", fontsize=16, rotate=0)
+            wr.append(p_tab, h2_item, fontsize=16)
+
+            # Insert ... between h2_item and page number
             p_tab_number = fitz.Point(
                 tab + horizontal_start_point + 500,
                 vertical_start_point + num_lines * spacing,
             )
-            page.insertText(
-                p_tab_number,
-                str(header_to_pagenumber[h2_item]),
-                fontname="helv",
-                fontsize=16,
-                rotate=0,
-            )
+            add_dot_connector(wr, wr.lastPoint, p_tab_number)
 
-            # TODO: If the mapping exists then move horizontally by 500 and then print that page number
+            # Insert page number for h2_item
+            wr.append(p_tab_number, str(header_to_pagenumber[h2_item]), fontsize=16)
             num_lines += 1
-        num_lines += 2
-        if num_lines >= 45:
-            page = doc.newPage(height=page_height, width=page_width)
-            horizontal_start_point = 40
-            vertical_start_point = 60
-            num_lines = 0
 
+            # Move to new page if nearing end of page
+            if num_lines >= 45:
+                wr.writeText(page)
+                page = doc.newPage(height=page_height, width=page_width)
+                wr = fitz.TextWriter(page.rect)
+                num_lines = 0
+        num_lines += 2
+
+    wr.writeText(page)
     return doc
+
+
+def add_dot_connector(wr, start, end):
+    """
+    Adds ... between a startpoint and endpoint. Uses a workaround to suppress unnecessary pymupdf warnings about text
+    overflow. Credits for workaround: https://stackoverflow.com/a/8447352
+    """
+    sys.stdout = open(os.devnull, "w")
+
+    dot_connector = "." * 200
+    rect_topleft = fitz.Point(start.x, start.y - 15)
+    rect_bottomright = fitz.Point(end.x, end.y + 10)
+    rect = fitz.Rect(rect_topleft, rect_bottomright)
+    wr.fillTextbox(rect, dot_connector)
+
+    sys.stdout = sys.__stdout__
 
 
 def get_headers_and_subheaders(tags=["h1"]):
@@ -166,11 +172,13 @@ def get_headers_and_subheaders(tags=["h1"]):
                 type(child) is not bs4.element.NavigableString
                 and child.string is not None
             ):
+                # Prevent addition of "" headers
+                if not section:
+                    continue
                 if headers_and_subheaders.get(section):
                     headers_and_subheaders[section].append(child.string)
                 else:
                     headers_and_subheaders[section] = [child.string]
-
     return headers_and_subheaders
 
 
@@ -229,8 +237,6 @@ def get_page_number(doc):
 
     page_num = 1
     for L1_header, L2_headers in headers_and_subheaders.items():
-        if not L1_header:
-            continue
         # First locate the L1 header
         page_num = locate(SECTION_DELIMITER + L1_header, doc, page_num)
         header_to_pagenumber[L1_header] = page_num
@@ -274,7 +280,7 @@ if __name__ == "__main__":
     doc.insertPDF(content_page, start_at=0, links=True)
 
     try:
-        add_toc(doc)
+        add_bookmarks(doc, header_to_pagenumber, headers_and_subs, content_page.pageCount)
     except Exception as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
