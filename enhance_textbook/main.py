@@ -28,7 +28,7 @@ OVERLAY = os.path.join(OUTPUT_FOLDER, "overlay.pdf")
 OUTPUT = os.path.join(OUTPUT_FOLDER, "textbook_output.pdf")
 DEFAULT_ERROR_MESSAGE = "%s phase failed"
 TEXTBOOK_WEBSITE = (
-    "https://nus-cs2103-ay1920s1.github.io/website/se-book-adapted/print.html"
+    "https://nus-cs2103-ay2021s1.github.io/website/se-book-adapted/print.html"
 )
 SECTION_DELIMITER = "SECTION: "
 
