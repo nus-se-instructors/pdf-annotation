@@ -17,6 +17,8 @@ import fitz
 import os
 import logging
 import sys
+import spacy
+import csv
 
 from collections import defaultdict, OrderedDict
 from urllib.request import urlopen
@@ -54,30 +56,59 @@ def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages,
 
 
 def generate_index_entries(doc):
-    import spacy
-
+    index_terms = get_index_terms()
     nlp = spacy.load("en_core_web_sm")
     output_dict = defaultdict(list)
     for page_number in range(doc.pageCount):
         page_text = doc.getPageText(page_number)
         parsed_doc = nlp(page_text)
-        proper_word = (
-            lambda x: x.pos_ != "PUNCT"
-            and x.pos_ != "VERB"
-            and x.text.isalpha()
-            and x.pos_ != "DET"
-            and x.pos != "ADV"
-        )
+        # Check noun phrases and individual words for matches with the index_terms
+        noun_phrases = [chunk.text for chunk in parsed_doc.noun_chunks]
+        for noun_phrase in noun_phrases:
+            if noun_phrase in index_terms:
+                output_dict[noun_phrase].append(page_number + 1)
         for word in parsed_doc:
-            if word.is_stop == False and proper_word(word):
+            if word.lemma_ in index_terms:
                 output_dict[word.lemma_].append(page_number + 1)
-    # Arbitrary filtering conditions
-    output_dict = {
-        k: v
-        for k, v in output_dict.items()
-        if (len(k) > 4 and len(v) <= 6 and len(k) <= 10 and "ly" not in k)
-    }
     return output_dict
+
+
+def get_index_terms():
+    """
+    Obtains a set of possible index terms.
+    """
+    index_terms = set()
+    index_terms |= get_index_terms_from_website()
+    index_terms |= get_index_terms_from_csv()
+    return index_terms
+
+
+def get_index_terms_from_website():
+    """
+    Obtains a set of possible index terms by using headers from the textbook website.
+    """
+    html = urlopen(TEXTBOOK_WEBSITE)
+    bs = bs4.BeautifulSoup(html, "html.parser")
+    index_terms = {header.text.replace(':', '').strip().lower() for header in bs.find_all(["h1", "h2", "h3", "h4", "h5"])}
+
+    # Filter out irrelevant words
+    irrelevant_words = {"basic", "intermediate", "advanced", "introduction", "what", "when", "why", "how", "more"}
+    return index_terms.difference(irrelevant_words)
+
+
+def get_index_terms_from_csv():
+    """
+    Obtains a list of possible index terms from a pre-generated csv file. csv file is assumed to be rows of
+    comma-separated strings
+    Source(s) for index terms:
+    https://www.iqbba.org/files/content/iqbba/downloads/Standard_glossary_of_terms_used_in_Software_Engineering_1.0.pdf
+    """
+    index_terms = set()
+    with open('inputs/terms.csv') as f:
+        reader = csv.reader(f, delimiter=',')
+        for row in reader:
+            index_terms |= set(row)
+    return index_terms
 
 
 def generate_content_page(
@@ -285,7 +316,6 @@ if __name__ == "__main__":
         logging.info(e)
         raise Exception("Bookmark addition failed")
 
-    """
     try:
         output_dict = generate_index_entries(doc)
     except Exception as e:
@@ -295,6 +325,5 @@ if __name__ == "__main__":
     index_page = generate_index_page(output_dict, page_width, page_height)
 
     doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
-    """
 
     doc.save(OUTPUT)
