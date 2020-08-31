@@ -58,7 +58,7 @@ def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages,
 def generate_index_entries(doc):
     index_terms = get_index_terms()
     nlp = spacy.load("en_core_web_sm")
-    output_dict = defaultdict(list)
+    index_term_pages = defaultdict(list)
     for page_number in range(doc.pageCount):
         page_text = doc.getPageText(page_number)
         parsed_doc = nlp(page_text)
@@ -66,11 +66,16 @@ def generate_index_entries(doc):
         noun_phrases = [chunk.text for chunk in parsed_doc.noun_chunks]
         for noun_phrase in noun_phrases:
             if noun_phrase in index_terms:
-                output_dict[noun_phrase].append(page_number + 1)
+                pages = index_term_pages[noun_phrase]
+                if not pages or pages[-1] != page_number + 1:
+                    pages.append(page_number + 1)
         for word in parsed_doc:
             if word.lemma_ in index_terms:
-                output_dict[word.lemma_].append(page_number + 1)
-    return output_dict
+                pages = index_term_pages[word.lemma_]
+                if not pages or pages[-1] != page_number + 1:
+                    pages.append(page_number + 1)
+    index_term_pages = {k: v for k, v in index_term_pages.items() if len(v) <= 10}
+    return index_term_pages
 
 
 def get_index_terms():
@@ -217,37 +222,37 @@ def is_new_section(header):
     return header and SECTION_DELIMITER in header
 
 
-def generate_index_page(output_dict, page_width, page_height):
+def generate_index_page(index_term_pages, page_width, page_height):
     doc = fitz.open()
     page = doc.newPage(height=page_height, width=page_width)
     horizontal_start_point = 40
     vertical_start_point = 45
-    index_keys = sorted(output_dict.keys(), key=lambda v: v.upper())
+    index_keys = sorted(index_term_pages.keys(), key=lambda v: v.upper())
     number_of_entries = len(index_keys)
     row_item_counter = 0
     row_item_counter_height = 8
-    items_per_column = 110
-    columns_per_page = 5
-    column_spacing = 125
-    column_item_counter = 1
+    items_per_column = 80
+    columns_per_page = 2
+    column_spacing = 200
+    column_item_counter = 0
     for item_counter in range(number_of_entries):
         row_item_counter += 1
         p = fitz.Point(
             horizontal_start_point + column_item_counter * column_spacing,
             vertical_start_point + row_item_counter * row_item_counter_height,
         )
-        if row_item_counter % items_per_column == 0:
+        if row_item_counter >= items_per_column:
             row_item_counter = 0
             column_item_counter += 1
 
-        if column_item_counter % columns_per_page == 0:
-            column_item_counter = 1
+        if column_item_counter >= columns_per_page:
+            column_item_counter = 0
             row_item_counter = 0
 
             page = doc.newPage(width=page_width, height=page_height)
-        index_word = index_keys[item_counter]
+        index_term = index_keys[item_counter]
 
-        text = "%s %s" % (index_word, list(set(output_dict[index_word])))
+        text = "%s %s" % (index_term, index_term_pages[index_term])
         page.insertText(
             p,  # bottom-left of 1st char
             text,  # the text (honors '\n')
@@ -317,12 +322,12 @@ if __name__ == "__main__":
         raise Exception("Bookmark addition failed")
 
     try:
-        output_dict = generate_index_entries(doc)
+        index_term_pages = generate_index_entries(doc)
     except Exception as e:
         logging.info(e)
         raise Exception("Index addition failed")
     
-    index_page = generate_index_page(output_dict, page_width, page_height)
+    index_page = generate_index_page(index_term_pages, page_width, page_height)
 
     doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
 
