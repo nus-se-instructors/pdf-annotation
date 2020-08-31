@@ -65,8 +65,8 @@ def generate_index_entries(doc):
         # Check noun phrases and individual words for matches with the index_terms
         noun_phrases = [chunk.text for chunk in parsed_doc.noun_chunks]
         for noun_phrase in noun_phrases:
-            if noun_phrase in index_terms:
-                pages = index_term_pages[noun_phrase]
+            if noun_phrase.lower() in index_terms:
+                pages = index_term_pages[noun_phrase.lower()]
                 if not pages or pages[-1] != page_number + 1:
                     pages.append(page_number + 1)
         for word in parsed_doc:
@@ -74,6 +74,7 @@ def generate_index_entries(doc):
                 pages = index_term_pages[word.lemma_]
                 if not pages or pages[-1] != page_number + 1:
                     pages.append(page_number + 1)
+    # Filter out index terms with more than 10 occurrences (likely not index-worthy)
     index_term_pages = {k: v for k, v in index_term_pages.items() if len(v) <= 10}
     return index_term_pages
 
@@ -230,10 +231,10 @@ def generate_index_page(index_term_pages, page_width, page_height):
     index_keys = sorted(index_term_pages.keys(), key=lambda v: v.upper())
     number_of_entries = len(index_keys)
     row_item_counter = 0
-    row_item_counter_height = 8
+    row_item_counter_height = 9
     items_per_column = 80
-    columns_per_page = 2
-    column_spacing = 200
+    columns_per_page = 3
+    column_spacing = 180
     column_item_counter = 0
     for item_counter in range(number_of_entries):
         row_item_counter += 1
@@ -252,7 +253,7 @@ def generate_index_page(index_term_pages, page_width, page_height):
             page = doc.newPage(width=page_width, height=page_height)
         index_term = index_keys[item_counter]
 
-        text = "%s %s" % (index_term, index_term_pages[index_term])
+        text = "%s %s" % (index_term, str(index_term_pages[index_term])[1:-1])
         page.insertText(
             p,  # bottom-left of 1st char
             text,  # the text (honors '\n')
