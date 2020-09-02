@@ -82,11 +82,13 @@ def generate_index_entries(doc):
 def get_index_terms():
     """
     Obtains a set of possible index terms.
+    The index terms will be scraped from website headings. There are additionally two csv files in the inputs folder,
+    include.csv and exclude.csv that can be used to specify what index terms to include or exclude.
     """
     index_terms = set()
     index_terms |= get_index_terms_from_website()
-    index_terms |= get_index_terms_from_csv()
-    return index_terms
+    index_terms |= get_index_terms_from_csv('inputs/include.csv')
+    return index_terms.difference(get_index_terms_from_csv('inputs/exclude.csv'))
 
 
 def get_index_terms_from_website():
@@ -95,14 +97,10 @@ def get_index_terms_from_website():
     """
     html = urlopen(TEXTBOOK_WEBSITE)
     bs = bs4.BeautifulSoup(html, "html.parser")
-    index_terms = {header.text.replace(':', '').strip().lower() for header in bs.find_all(["h1", "h2", "h3", "h4", "h5"])}
-
-    # Filter out irrelevant words
-    irrelevant_words = {"basic", "intermediate", "advanced", "introduction", "what", "when", "why", "how", "more"}
-    return index_terms.difference(irrelevant_words)
+    return {header.text.replace(':', '').strip().lower() for header in bs.find_all(["h1", "h2", "h3", "h4", "h5"])}
 
 
-def get_index_terms_from_csv():
+def get_index_terms_from_csv(filename):
     """
     Obtains a list of possible index terms from a pre-generated csv file. csv file is assumed to be rows of
     comma-separated strings
@@ -110,7 +108,7 @@ def get_index_terms_from_csv():
     https://www.iqbba.org/files/content/iqbba/downloads/Standard_glossary_of_terms_used_in_Software_Engineering_1.0.pdf
     """
     index_terms = set()
-    with open('inputs/terms.csv') as f:
+    with open(filename) as f:
         reader = csv.reader(f, delimiter=',')
         for row in reader:
             index_terms |= set(row)
