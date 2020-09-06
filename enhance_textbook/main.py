@@ -251,7 +251,7 @@ def generate_index_page(index_term_pages, page_width, page_height):
             page = doc.newPage(width=page_width, height=page_height)
         index_term = index_keys[item_counter]
 
-        text = "%s %s" % (index_term, str(index_term_pages[index_term])[1:-1])
+        text = "%s %s" % (index_term, format_as_page_range(index_term_pages[index_term]))
         page.insertText(
             p,  # bottom-left of 1st char
             text,  # the text (honors '\n')
@@ -261,6 +261,35 @@ def generate_index_page(index_term_pages, page_width, page_height):
         )
 
     return doc
+
+
+def format_as_page_range(page_numbers):
+    """
+    Formats a list of page numbers into more readable and condensed page ranges (as a string)
+    e.g. [1,3,4,5,6,7,20] -> "1, 3-7, 20"
+    """
+    if not page_numbers:
+        return []
+    page_ranges = []
+    prev_num = page_numbers[0]
+    consecutive_nums = 1
+    for page_num in page_numbers[1:]:
+        if page_num == prev_num + consecutive_nums:
+            consecutive_nums += 1
+        else:
+            # Reached the end of a consecutive range
+            if consecutive_nums > 1:
+                page_ranges.append("%d-%d" % (prev_num, prev_num + consecutive_nums - 1))
+            else:
+                page_ranges.append(str(prev_num))
+            prev_num = page_num
+            consecutive_nums = 1
+    # Add the last consecutive range
+    if consecutive_nums > 1:
+        page_ranges.append("%d-%d" % (prev_num, prev_num + consecutive_nums - 1))
+    else:
+        page_ranges.append(str(prev_num))
+    return ', '.join(page_ranges)
 
 
 def get_page_number(doc):
