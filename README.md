@@ -1,6 +1,6 @@
 ## Usage
-1. `git clone https://github.com/J0/CP3106.git`
-2. `cd CP3106 && virtualenv .env`
+1. `git clone https://github.com/nus-se-instructors/pdf-annotation.git`
+2. `cd pdf-annotation && virtualenv .env`
 3. `source ./.env/bin/activate` (on Windows, use `".env/Scripts/activate.bat"` -- note the double quotes)
 4. `pip install -r requirements.txt`
 5. Download chromedriver from https://chromedriver.chromium.org/downloads and place the binary in the `enhance_textbook` directory (if a new copy of the textbook has to be downloaded)
