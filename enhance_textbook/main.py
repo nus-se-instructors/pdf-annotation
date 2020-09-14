@@ -17,7 +17,7 @@ import fitz
 import os
 import logging
 import sys
-import spacy
+import ahocorasick
 import csv
 
 from collections import defaultdict, OrderedDict
@@ -57,23 +57,22 @@ def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages,
 
 def generate_index_entries(doc):
     index_terms = get_index_terms()
-    nlp = spacy.load("en_core_web_sm")
     index_term_pages = defaultdict(list)
+
+    # Use Aho-Corasick algorithm for fast string-searching
+    A = ahocorasick.Automaton()
+    for index_term in index_terms:
+        A.add_word(index_term, index_term)
+    A.make_automaton()
+
     for page_number in range(doc.pageCount):
         page_text = doc.getPageText(page_number)
-        parsed_doc = nlp(page_text)
-        # Check noun phrases and individual words for matches with the index_terms
-        noun_phrases = [chunk.text for chunk in parsed_doc.noun_chunks]
-        for noun_phrase in noun_phrases:
-            if noun_phrase.lower() in index_terms:
-                pages = index_term_pages[noun_phrase.lower()]
-                if not pages or pages[-1] != page_number + 1:
-                    pages.append(page_number + 1)
-        for word in parsed_doc:
-            if word.lemma_ in index_terms:
-                pages = index_term_pages[word.lemma_]
-                if not pages or pages[-1] != page_number + 1:
-                    pages.append(page_number + 1)
+        for _, term in A.iter(page_text.lower()):
+            # Add page number for the term if it does not already exist
+            pages = index_term_pages[term]
+            if not pages or pages[-1] != page_number + 1:
+                pages.append(page_number + 1)
+
     # Filter out index terms with more than 10 occurrences (likely not index-worthy)
     index_term_pages = {k: v for k, v in index_term_pages.items() if len(v) <= 10}
     return index_term_pages
@@ -97,7 +96,9 @@ def get_index_terms_from_website():
     """
     html = urlopen(TEXTBOOK_WEBSITE)
     bs = bs4.BeautifulSoup(html, "html.parser")
-    return {header.text.replace(':', '').strip().lower() for header in bs.find_all(["h1", "h2", "h3", "h4", "h5"])}
+    headers = {header.text.replace(':', '').strip().lower() for header in bs.find_all(["h1", "h2", "h3", "h4", "h5"])}
+    # Filter out headers that are longer than 3 words (unlikely to be index-worthy)
+    return {header for header in headers if len(header.split(' ')) <= 3}
 
 
 def get_index_terms_from_csv(filename):
