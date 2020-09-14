@@ -241,6 +241,17 @@ def generate_index_page(index_term_pages, page_width, page_height):
             horizontal_start_point + column_item_counter * column_spacing,
             vertical_start_point + row_item_counter * row_item_counter_height,
         )
+        # Insert index term along with page number references
+        index_term = index_keys[item_counter]
+        text = "%s %s" % (index_term, format_as_page_range(index_term_pages[index_term]))
+        page.insertText(
+            p,  # bottom-left of 1st char
+            text,  # the text (honors '\n')
+            fontname="helv",  # the default font
+            fontsize=8,  # the default font size
+            rotate=0,
+        )
+        # Increment row and column counter accordingly
         if row_item_counter >= items_per_column:
             row_item_counter = 0
             column_item_counter += 1
@@ -250,16 +261,6 @@ def generate_index_page(index_term_pages, page_width, page_height):
             row_item_counter = 0
 
             page = doc.newPage(width=page_width, height=page_height)
-        index_term = index_keys[item_counter]
-
-        text = "%s %s" % (index_term, format_as_page_range(index_term_pages[index_term]))
-        page.insertText(
-            p,  # bottom-left of 1st char
-            text,  # the text (honors '\n')
-            fontname="helv",  # the default font
-            fontsize=8,  # the default font size
-            rotate=0,
-        )
 
     return doc
 
