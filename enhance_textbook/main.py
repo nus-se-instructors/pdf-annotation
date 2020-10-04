@@ -17,6 +17,8 @@ import fitz
 import os
 import logging
 import sys
+import ahocorasick
+import csv
 
 from collections import defaultdict, OrderedDict
 from urllib.request import urlopen
@@ -54,30 +56,64 @@ def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages,
 
 
 def generate_index_entries(doc):
-    import spacy
+    index_terms = get_index_terms()
+    index_term_pages = defaultdict(list)
 
-    nlp = spacy.load("en_core_web_sm")
-    output_dict = defaultdict(list)
+    # Use Aho-Corasick algorithm for fast string-searching
+    A = ahocorasick.Automaton()
+    for index_term in index_terms:
+        A.add_word(index_term, index_term)
+    A.make_automaton()
+
     for page_number in range(doc.pageCount):
         page_text = doc.getPageText(page_number)
-        parsed_doc = nlp(page_text)
-        proper_word = (
-            lambda x: x.pos_ != "PUNCT"
-            and x.pos_ != "VERB"
-            and x.text.isalpha()
-            and x.pos_ != "DET"
-            and x.pos != "ADV"
-        )
-        for word in parsed_doc:
-            if word.is_stop == False and proper_word(word):
-                output_dict[word.lemma_].append(page_number + 1)
-    # Arbitrary filtering conditions
-    output_dict = {
-        k: v
-        for k, v in output_dict.items()
-        if (len(k) > 4 and len(v) <= 6 and len(k) <= 10 and "ly" not in k)
-    }
-    return output_dict
+        for _, term in A.iter(page_text.lower()):
+            # Add page number for the term if it does not already exist
+            pages = index_term_pages[term]
+            if not pages or pages[-1] != page_number + 1:
+                pages.append(page_number + 1)
+
+    # Filter out index terms with more than 10 occurrences (likely not index-worthy)
+    index_term_pages = {k: v for k, v in index_term_pages.items() if len(v) <= 10}
+    return index_term_pages
+
+
+def get_index_terms():
+    """
+    Obtains a set of possible index terms.
+    The index terms will be scraped from website headings. There are additionally two csv files in the inputs folder,
+    include.csv and exclude.csv that can be used to specify what index terms to include or exclude.
+    """
+    index_terms = set()
+    index_terms |= get_index_terms_from_website()
+    index_terms |= get_index_terms_from_csv('inputs/include.csv')
+    return index_terms.difference(get_index_terms_from_csv('inputs/exclude.csv'))
+
+
+def get_index_terms_from_website():
+    """
+    Obtains a set of possible index terms by using headers from the textbook website.
+    """
+    html = urlopen(TEXTBOOK_WEBSITE)
+    bs = bs4.BeautifulSoup(html, "html.parser")
+    headers = {header.text.replace(':', '').strip().lower() for header in bs.find_all(["h1", "h2", "h3", "h4", "h5"])}
+    # Filter out headers that are longer than 3 words (unlikely to be index-worthy)
+    return {header for header in headers if len(header.split(' ')) <= 3}
+
+
+def get_index_terms_from_csv(filename):
+    """
+    Obtains a list of possible index terms from a pre-generated csv file. csv file is assumed to be rows of
+    comma-separated strings
+    Source(s) for index terms:
+    https://www.iqbba.org/files/content/iqbba/downloads/Standard_glossary_of_terms_used_in_Software_Engineering_1.0.pdf
+    """
+    index_terms = set()
+    with open(filename) as f:
+        reader = csv.reader(f, delimiter=',')
+        for row in reader:
+            index_terms |= set(row)
+    return index_terms
 
 
 def generate_content_page(
@@ -186,37 +222,28 @@ def is_new_section(header):
     return header and SECTION_DELIMITER in header
 
 
-def generate_index_page(output_dict, page_width, page_height):
+def generate_index_page(index_term_pages, page_width, page_height):
     doc = fitz.open()
     page = doc.newPage(height=page_height, width=page_width)
     horizontal_start_point = 40
     vertical_start_point = 45
-    index_keys = sorted(output_dict.keys(), key=lambda v: v.upper())
+    index_keys = sorted(index_term_pages.keys(), key=lambda v: v.upper())
     number_of_entries = len(index_keys)
     row_item_counter = 0
-    row_item_counter_height = 8
-    items_per_column = 110
-    columns_per_page = 5
-    column_spacing = 125
-    column_item_counter = 1
+    row_item_counter_height = 9
+    items_per_column = 80
+    columns_per_page = 3
+    column_spacing = 180
+    column_item_counter = 0
     for item_counter in range(number_of_entries):
         row_item_counter += 1
         p = fitz.Point(
             horizontal_start_point + column_item_counter * column_spacing,
             vertical_start_point + row_item_counter * row_item_counter_height,
         )
-        if row_item_counter % items_per_column == 0:
-            row_item_counter = 0
-            column_item_counter += 1
-
-        if column_item_counter % columns_per_page == 0:
-            column_item_counter = 1
-            row_item_counter = 0
-
-            page = doc.newPage(width=page_width, height=page_height)
-        index_word = index_keys[item_counter]
-
-        text = "%s %s" % (index_word, list(set(output_dict[index_word])))
+        # Insert index term along with page number references
+        index_term = index_keys[item_counter]
+        text = "%s %s" % (index_term, format_as_page_range(index_term_pages[index_term]))
         page.insertText(
             p,  # bottom-left of 1st char
             text,  # the text (honors '\n')
@@ -224,8 +251,47 @@ def generate_index_page(output_dict, page_width, page_height):
             fontsize=8,  # the default font size
             rotate=0,
         )
+        # Increment row and column counter accordingly
+        if row_item_counter >= items_per_column:
+            row_item_counter = 0
+            column_item_counter += 1
+
+        if column_item_counter >= columns_per_page:
+            column_item_counter = 0
+            row_item_counter = 0
+
+            page = doc.newPage(width=page_width, height=page_height)
 
     return doc
+
+
+def format_as_page_range(page_numbers):
+    """
+    Formats a list of page numbers into more readable and condensed page ranges (as a string)
+    e.g. [1,3,4,5,6,7,20] -> "1, 3-7, 20"
+    """
+    if not page_numbers:
+        return []
+    page_ranges = []
+    prev_num = page_numbers[0]
+    consecutive_nums = 1
+    for page_num in page_numbers[1:]:
+        if page_num == prev_num + consecutive_nums:
+            consecutive_nums += 1
+        else:
+            # Reached the end of a consecutive range
+            if consecutive_nums > 1:
+                page_ranges.append("%d-%d" % (prev_num, prev_num + consecutive_nums - 1))
+            else:
+                page_ranges.append(str(prev_num))
+            prev_num = page_num
+            consecutive_nums = 1
+    # Add the last consecutive range
+    if consecutive_nums > 1:
+        page_ranges.append("%d-%d" % (prev_num, prev_num + consecutive_nums - 1))
+    else:
+        page_ranges.append(str(prev_num))
+    return ', '.join(page_ranges)
 
 
 def get_page_number(doc):
@@ -285,16 +351,14 @@ if __name__ == "__main__":
         logging.info(e)
         raise Exception("Bookmark addition failed")
 
-    """
     try:
-        output_dict = generate_index_entries(doc)
+        index_term_pages = generate_index_entries(doc)
     except Exception as e:
         logging.info(e)
         raise Exception("Index addition failed")
     
-    index_page = generate_index_page(output_dict, page_width, page_height)
+    index_page = generate_index_page(index_term_pages, page_width, page_height)
 
     doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
-    """
 
     doc.save(OUTPUT)
