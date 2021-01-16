@@ -116,9 +116,10 @@ def get_index_terms_from_csv(filename):
     return index_terms
 
 
-def generate_content_page(
-    header_to_pagenumber, headers_and_subheaders, page_height, page_width
-):
+def generate_content_page(header_to_pagenumber, headers_and_subheaders, page_height, page_width):
+    """
+    Generates a document that serves as a Table of Contents, with header and subheader information.
+    """
     doc = fitz.open()
     page = doc.newPage(height=page_height, width=page_width)
     horizontal_start_point = 40
