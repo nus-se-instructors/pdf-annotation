@@ -55,7 +55,12 @@ def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages,
     doc.save(OUTPUT)
 
 
-def generate_index_entries(doc):
+def generate_index_entries(doc, page_offset=0):
+    """
+    Generates a mapping of index terms to lists of page numbers which contain those terms.
+    Page offset is an optional argument to specify how many unnumbered pages there are at the start of the document
+    (e.g. table of contents)
+    """
     index_terms = get_index_terms()
     index_term_pages = defaultdict(list)
 
@@ -68,10 +73,11 @@ def generate_index_entries(doc):
     for page_number in range(doc.pageCount):
         page_text = doc.getPageText(page_number)
         for _, term in A.iter(page_text.lower()):
+            page_number_actual = page_number - page_offset + 1
             # Add page number for the term if it does not already exist
             pages = index_term_pages[term]
-            if not pages or pages[-1] != page_number + 1:
-                pages.append(page_number + 1)
+            if not pages or pages[-1] != page_number_actual:
+                pages.append(page_number_actual)
 
     # Filter out index terms with more than 10 occurrences (likely not index-worthy)
     index_term_pages = {k: v for k, v in index_term_pages.items() if len(v) <= 10}
@@ -352,7 +358,7 @@ if __name__ == "__main__":
         raise Exception("Bookmark addition failed")
 
     try:
-        index_term_pages = generate_index_entries(doc)
+        index_term_pages = generate_index_entries(doc, content_page.pageCount)
     except Exception as e:
         logging.info(e)
         raise Exception("Index addition failed")
