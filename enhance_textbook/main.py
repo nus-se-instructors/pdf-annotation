@@ -126,11 +126,14 @@ def generate_content_page(
     spacing = 15
     num_lines = 1
     tab = 30
-    p = fitz.Point(
-        horizontal_start_point + 250, vertical_start_point + num_lines * spacing
-    )
-    page.insertText(p, "Table of Contents", fontname="helv", fontsize=32)
+
+    # Add Table of Contents heading (centered)
+    rect_topleft = fitz.Point(0, vertical_start_point + num_lines * spacing)
     num_lines += 4
+    rect_bottomright = fitz.Point(page_width, vertical_start_point + num_lines * spacing)
+    rect = fitz.Rect(rect_topleft, rect_bottomright)
+    page.insertTextbox(rect, "Table of Contents", fontsize=32, align=fitz.TEXT_ALIGN_CENTER)
+    num_lines += 2
 
     # Create a TextWriter (per page)
     wr = fitz.TextWriter(page.rect)
