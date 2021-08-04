@@ -341,7 +341,8 @@ if __name__ == "__main__":
         downloader.download_to(TEXTBOOK)
     except Exception as e:
         logging.info(e)
-        print("Download failed, using existing copy of textbook")
+        print(e)
+        raise e  # no point continuing as the code doesn't work for existing PDF file
 
     doc = fitz.open(TEXTBOOK)
 
