@@ -149,7 +149,7 @@ def generate_content_page(header_to_pagenumber, headers_and_subheaders, page_hei
         p = fitz.Point(
             horizontal_start_point, vertical_start_point + num_lines * spacing
         )
-        wr.append(p, h1_item, fontsize=24)
+        wr.append(p, h1_item, fontsize=24, font=fitz.Font("Arial"))
         num_lines += 2
         for h2_item in h2_items:
             # Insert each h2_item
