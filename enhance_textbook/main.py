@@ -31,10 +31,10 @@ OVERLAY = os.path.join(OUTPUT_FOLDER, "overlay.pdf")
 OUTPUT = os.path.join(OUTPUT_FOLDER, "textbook_output.pdf")
 DEFAULT_ERROR_MESSAGE = "%s phase failed"
 TEXTBOOK_WEBSITE = (
-    #"https://nus-cs2103-ay2223s2.github.io/website/se-book-adapted/print.html"
+    "https://nus-cs2103-ay2223s2.github.io/website/se-book-adapted/print.html"
     #"https://nus-cs2113-ay2223s2.github.io/website/se-book-adapted/print.html"
     #"https://nus-tee3201.github.io/2022/se-book-adapted/print.html"
-    "https://nus-tic2002-ay2223s2.github.io/website/se-book-adapted/print.html"
+    #"https://nus-tic2002-ay2223s2.github.io/website/se-book-adapted/print.html"
 )
 SECTION_DELIMITER = "SECTION: "
 
@@ -54,7 +54,7 @@ def add_bookmarks(doc, header_to_pagenumber, headers_and_subs, no_content_pages,
 
     logging.info("The items in the table of contents are:" % toc)
     # Save bookmarks
-    doc.setToC(toc)
+    #doc.set_oc(toc, 0)  # not working after upgrading to python 10
     doc.save(OUTPUT)
 
 
@@ -73,8 +73,8 @@ def generate_index_entries(doc, page_offset=0):
         A.add_word(index_term, index_term)
     A.make_automaton()
 
-    for page_number in range(doc.pageCount):
-        page_text = doc.getPageText(page_number)
+    for page_number in range(doc.page_count):
+        page_text = doc.get_page_text(page_number)
         for _, term in A.iter(page_text.lower()):
             page_number_actual = page_number - page_offset + 1
             # Add page number for the term if it does not already exist
@@ -130,7 +130,7 @@ def generate_content_page(header_to_pagenumber, headers_and_subheaders, page_hei
     Generates a document that serves as a Table of Contents, with header and subheader information.
     """
     doc = fitz.open()
-    page = doc.newPage(height=page_height, width=page_width)
+    page = doc.new_page(height=page_height, width=page_width)
     horizontal_start_point = 40
     vertical_start_point = 60
     spacing = 15
@@ -142,7 +142,7 @@ def generate_content_page(header_to_pagenumber, headers_and_subheaders, page_hei
     num_lines += 4
     rect_bottomright = fitz.Point(page_width, vertical_start_point + num_lines * spacing)
     rect = fitz.Rect(rect_topleft, rect_bottomright)
-    page.insertTextbox(rect, "Table of Contents", fontsize=32, align=fitz.TEXT_ALIGN_CENTER)
+    page.insert_textbox(rect, "Table of Contents", fontsize=32, align=fitz.TEXT_ALIGN_CENTER)
     num_lines += 2
 
     # Create a TextWriter (per page)
@@ -152,7 +152,7 @@ def generate_content_page(header_to_pagenumber, headers_and_subheaders, page_hei
         p = fitz.Point(
             horizontal_start_point, vertical_start_point + num_lines * spacing
         )
-        wr.append(p, h1_item, fontsize=24, font=fitz.Font("Arial"))
+        wr.append(p, h1_item, fontsize=24)
         num_lines += 2
         for h2_item in h2_items:
             # Insert each h2_item
@@ -166,7 +166,7 @@ def generate_content_page(header_to_pagenumber, headers_and_subheaders, page_hei
                 tab + horizontal_start_point + 500,
                 vertical_start_point + num_lines * spacing,
             )
-            add_dot_connector(wr, wr.lastPoint, p_tab_number)
+            add_dot_connector(wr, wr.last_point, p_tab_number)
 
             # Insert page number for h2_item
             wr.append(p_tab_number, str(header_to_pagenumber[h2_item]), fontsize=16)
@@ -174,13 +174,13 @@ def generate_content_page(header_to_pagenumber, headers_and_subheaders, page_hei
 
             # Move to new page if nearing end of page
             if num_lines >= 45:
-                wr.writeText(page)
-                page = doc.newPage(height=page_height, width=page_width)
+                wr.write_text(page)
+                page = doc.new_page(height=page_height, width=page_width)
                 wr = fitz.TextWriter(page.rect)
                 num_lines = 0
         num_lines += 2
 
-    wr.writeText(page)
+    wr.write_text(page)
     return doc
 
 
@@ -195,7 +195,7 @@ def add_dot_connector(wr, start, end):
     rect_topleft = fitz.Point(start.x, start.y - 15)
     rect_bottomright = fitz.Point(end.x, end.y + 10)
     rect = fitz.Rect(rect_topleft, rect_bottomright)
-    wr.fillTextbox(rect, dot_connector)
+    wr.fill_textbox(rect, dot_connector)
 
     sys.stdout = sys.__stdout__
 
@@ -237,7 +237,7 @@ def is_new_section(header):
 
 def generate_index_page(index_term_pages, page_width, page_height):
     doc = fitz.open()
-    page = doc.newPage(height=page_height, width=page_width)
+    page = doc.new_page(height=page_height, width=page_width)
     horizontal_start_point = 40
     vertical_start_point = 45
     index_keys = sorted(index_term_pages.keys(), key=lambda v: v.upper())
@@ -257,7 +257,7 @@ def generate_index_page(index_term_pages, page_width, page_height):
         # Insert index term along with page number references
         index_term = index_keys[item_counter]
         text = "%s %s" % (index_term, format_as_page_range(index_term_pages[index_term]))
-        page.insertText(
+        page.insert_text(
             p,  # bottom-left of 1st char
             text,  # the text (honors '\n')
             fontname="helv",  # the default font
@@ -273,7 +273,7 @@ def generate_index_page(index_term_pages, page_width, page_height):
             column_item_counter = 0
             row_item_counter = 0
 
-            page = doc.newPage(width=page_width, height=page_height)
+            page = doc.new_page(width=page_width, height=page_height)
 
     return doc
 
@@ -333,7 +333,7 @@ def locate(keyword, doc, page_num):
     """
     Searches for the given keyword in the doc starting from a specified page number
     """
-    while keyword not in doc.getPageText(page_num - 1) and page_num < doc.pageCount:
+    while keyword not in doc.get_page_text(page_num - 1) and page_num < doc.page_count:
         page_num += 1
     return page_num
 
@@ -357,22 +357,22 @@ if __name__ == "__main__":
     content_page = generate_content_page(
         header_to_pagenumber, headers_and_subs, page_height, page_width
     )
-    doc.insertPDF(content_page, start_at=0, links=True)
+    doc.insert_pdf(content_page, start_at=0, links=True)
 
     try:
-        add_bookmarks(doc, header_to_pagenumber, headers_and_subs, content_page.pageCount)
+        add_bookmarks(doc, header_to_pagenumber, headers_and_subs, content_page.page_count)
     except Exception as e:
         logging.info(e)
         raise Exception("Bookmark addition failed")
 
     try:
-        index_term_pages = generate_index_entries(doc, content_page.pageCount)
+        index_term_pages = generate_index_entries(doc, content_page.page_count)
     except Exception as e:
         logging.info(e)
         raise Exception("Index addition failed")
     
     index_page = generate_index_page(index_term_pages, page_width, page_height)
 
-    doc.insertPDF(index_page, start_at=doc.pageCount, links=True)
+    doc.insert_pdf(index_page, start_at=doc.page_count, links=True)
 
     doc.save(OUTPUT)
