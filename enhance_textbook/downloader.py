@@ -14,7 +14,7 @@ class Downloader:
         #chrome_options.add_argument('headless')  # removed because this causes some images to be missing
         driver = webdriver.Chrome(options=chrome_options, executable_path='C:/chromedriver/chromedriver.exe')
         driver.get(self.url)
-        input('\n\n################ is the page loaded fully?\n\n')
+        input('\n\n#### use the print function to force a full load of the page, and hit enter\n\n')
         print('continuing to create pdf...')
         print_settings = {'printBackground': True, 'displayHeaderFooter': True,
                           'headerTemplate': '<div class="page-header" style="width:100%; text-align:right; '
