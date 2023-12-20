@@ -1,3 +1,5 @@
+Note: Python cannot be higher than 3.10 as PyMuPDF is not compatible with higher versions
+
 ## Usage
 1. `git clone https://github.com/nus-se-instructors/pdf-annotation.git`
 2. `cd pdf-annotation && virtualenv .env`
