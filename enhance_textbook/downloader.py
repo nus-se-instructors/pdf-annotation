@@ -12,7 +12,7 @@ class Downloader:
     def download_to(self, filename):
         chrome_options = webdriver.ChromeOptions()
         #chrome_options.add_argument('headless')  # removed because this causes some images to be missing
-        driver = webdriver.Chrome(options=chrome_options, executable_path='C:/chromedriver/chromedriver.exe')
+        driver = webdriver.Chrome(options=chrome_options, executable_path='/opt/homebrew/bin/chromedriver')
         driver.get(self.url)
         input('\n\n#### use the print function to force a full load of the page, and hit enter\n\n')
         print('continuing to create pdf...')
