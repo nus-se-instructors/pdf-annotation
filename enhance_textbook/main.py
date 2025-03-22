@@ -25,14 +25,18 @@ from urllib.request import urlopen
 
 from downloader import Downloader
 
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 OUTPUT_FOLDER = "./outputs"
 TEXTBOOK = "./inputs/textbook.pdf"
 OVERLAY = os.path.join(OUTPUT_FOLDER, "overlay.pdf")
 OUTPUT = os.path.join(OUTPUT_FOLDER, "textbook_output.pdf")
 DEFAULT_ERROR_MESSAGE = "%s phase failed"
 TEXTBOOK_WEBSITE = (
-    "https://nus-cs2103-ay2425s1.github.io/website/se-book-adapted/print.html"
-    #"https://nus-cs2113-ay2425s1.github.io/website/se-book-adapted/print.html"
+    # "http://127.0.0.1:8080/website/se-book-adapted/print.html"
+    # "https://nus-cs2103-ay2425s2.github.io/website/se-book-adapted/print.html"
+    # "https://nus-cs2113-ay2425s2.github.io/website/se-book-adapted/print.html"
     #"https://nus-tee3201.github.io/2024/se-book-adapted/print.html"
     #"https://nus-tic2002-ay2425s1.github.io/website/se-book-adapted/print.html"
 )
